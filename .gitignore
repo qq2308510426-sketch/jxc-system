@@ -1,0 +1,31 @@
+﻿# Dependencies
+node_modules/
+**/node_modules/
+
+# Build outputs
+target/
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Maven (keep only pom.xml)
+apache-maven-*/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Video files (too large)
+*.mp4
+
+# Temp files
+*.tmp
+*.swp
