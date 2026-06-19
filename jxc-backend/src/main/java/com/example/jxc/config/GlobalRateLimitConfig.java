@@ -1,4 +1,4 @@
-﻿package com.example.jxc.config;
+package com.example.jxc.config;
 
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletResponse;

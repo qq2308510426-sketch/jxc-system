@@ -1,4 +1,4 @@
-﻿package com.example.jxc.controller;
+package com.example.jxc.controller;
 
 import com.example.jxc.common.Result;
 import org.springframework.web.bind.annotation.*;
