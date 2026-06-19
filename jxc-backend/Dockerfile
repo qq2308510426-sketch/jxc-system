@@ -1,8 +1,8 @@
 FROM maven:3.9-eclipse-temurin-17-alpine AS build
 WORKDIR /app
-COPY pom.xml .
+COPY jxc-backend/pom.xml .
 RUN mvn dependency:go-offline -B
-COPY src ./src
+COPY jxc-backend/src ./src
 RUN mvn package -DskipTests -B
 
 FROM eclipse-temurin:17-jre-alpine
