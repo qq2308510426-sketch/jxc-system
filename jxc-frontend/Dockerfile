@@ -11,4 +11,4 @@ RUN rm -f /etc/nginx/conf.d/default.conf
 COPY nginx-simple.conf /etc/nginx/app.conf
 ENV PORT=8080
 EXPOSE 8080
-CMD ["/bin/sh", "-c", "sed 's/__PORT__/${PORT}/g' /etc/nginx/app.conf > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
+CMD ["/bin/sh", "-c", "sed \"s/__PORT__/${PORT}/g\" /etc/nginx/app.conf > /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
