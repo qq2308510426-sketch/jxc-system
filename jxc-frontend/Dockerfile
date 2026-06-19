@@ -7,5 +7,5 @@ RUN npm run build
 
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx-simple.conf /etc/nginx/templates/default.conf.template
-CMD ["/bin/sh", "-c", "envsubst '`$BACKEND_HOST' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+COPY nginx-simple.conf /etc/nginx/conf.d/default.conf
+CMD ["nginx", "-g", "daemon off;"]
