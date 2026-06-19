@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="min-h-screen flex">
     <!-- Left: Decorative -->
     <div class="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -12,7 +12,7 @@
           </div>
           <h1 class="text-4xl font-bold mb-4 tracking-tight">企业进销存管理系统</h1>
           <p class="text-slate-300 text-lg leading-relaxed max-w-md">
-            基于 Spring Boot + Vue.js 的现代化企业库存管理解决方案
+            基于 Spring Boot + Vue.js 的现代化企业管理解决方案
           </p>
         </div>
         <div class="space-y-4 mt-8">
@@ -128,8 +128,10 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import request from '@/api/request'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const user = useUserStore()
 const loading = ref(false)
 const showPassword = ref(false)
 
@@ -154,10 +156,7 @@ const handleLogin = async () => {
   loading.value = true
   try {
     const res = await request.post('/auth/login', form)
-    localStorage.setItem('token', res.data.token)
-    localStorage.setItem('username', res.data.userInfo?.username || '')
-    localStorage.setItem('realName', res.data.userInfo?.realName || '')
-    localStorage.setItem('role', res.data.userInfo?.role || '')
+    user.setAuth(res.data)
     router.push('/dashboard')
   } catch (err) {
     // error handled by interceptor

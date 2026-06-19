@@ -15,8 +15,6 @@ import com.example.jxc.mapper.ProductMapper;
 import com.example.jxc.mapper.CustomerMapper;
 import com.example.jxc.entity.Customer;
 import com.example.jxc.mapper.StockOutMapper;
-import com.example.jxc.mapper.SupplierMapper;
-import com.example.jxc.entity.Supplier;
 import com.example.jxc.service.OrderService;
 import com.example.jxc.vo.OrderVO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +27,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.UUID;
 
 @Service
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements OrderService {
@@ -49,15 +47,10 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     @Autowired
     private CustomerMapper customerMapper;
 
-    @Autowired
-    private SupplierMapper supplierMapper;
-
-    private static final AtomicLong ORDER_SEQ = new AtomicLong(System.currentTimeMillis() % 100000);
-
     private String generateOrderNo() {
         String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        long seq = ORDER_SEQ.incrementAndGet() % 100000;
-        return "ORD" + dateStr + String.format("%05d", seq);
+        String uuid = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        return "ORD" + dateStr + uuid;
     }
 
     @Override
@@ -69,7 +62,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .map(item -> item.getUnitPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        
         Customer customer = customerMapper.selectById(dto.getCustomerId());
         if (customer != null && customer.getCreditLimit() != null && customer.getCreditLimit().compareTo(BigDecimal.ZERO) > 0) {
             LambdaQueryWrapper<Order> creditWrapper = new LambdaQueryWrapper<>();
@@ -81,7 +73,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .add(totalAmount);
             if (outstandingAmount.compareTo(customer.getCreditLimit()) > 0) {
-                throw new BusinessException("\u5ba2\u6237\u4fe1\u7528\u989d\u5ea6\u4e0d\u8db3\uff0c\u5f53\u524d\u5e94\u4ed8: " + outstandingAmount + " / \u989d\u5ea6: " + customer.getCreditLimit());
+                throw new BusinessException("\u5ba2\u6237\u4fe1\u7528\u989d\u5ea6\u4e0d\u8db3\uff0c\u5f53\u524d\u5e94\u4ed8\u6b3e: " + outstandingAmount + " / \u989d\u5ea6: " + customer.getCreditLimit());
             }
         }
 
@@ -116,8 +108,7 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
                     + " \u53ef\u7528\u5e93\u5b58: " + availableStock);
             }
 
-            int currentReserved = product.getReservedStock() != null ? product.getReservedStock() : 0;
-            product.setReservedStock(currentReserved + itemDTO.getQuantity());
+            product.setReservedStock((product.getReservedStock() != null ? product.getReservedStock() : 0) + itemDTO.getQuantity());
             productMapper.updateById(product);
         }
     }
@@ -129,48 +120,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (order == null) {
             throw new BusinessException("\u8ba2\u5355\u4e0d\u5b58\u5728");
         }
-
-        int oldStatus = order.getStatus();
-        if (oldStatus == status) return;
-        if (oldStatus == 4) {
-            throw new BusinessException("\u5df2\u53d6\u6d88\u7684\u8ba2\u5355\u4e0d\u80fd\u4fee\u6539");
-        }
-        if (oldStatus == 3) {
-            throw new BusinessException("\u5df2\u5b8c\u6210\u7684\u8ba2\u5355\u4e0d\u80fd\u4fee\u6539");
-        }
-        if (oldStatus == 0 && status != 1) {
-            throw new BusinessException("\u5f85\u5904\u7406\u8ba2\u5355\u53ea\u80fd\u786e\u8ba4");
-        }
-        if (oldStatus == 1 && status != 2 && status != 4) {
-            throw new BusinessException("\u5df2\u786e\u8ba4\u8ba2\u5355\u53ea\u80fd\u53d1\u8d27\u6216\u53d6\u6d88");
-        }
-        if (oldStatus == 2 && status != 3 && status != 4) {
-            throw new BusinessException("\u53d1\u8d27\u4e2d\u8ba2\u5355\u53ea\u80fd\u5b8c\u6210\u6216\u53d6\u6d88");
-        }
-        if (status < 0 || status > 4) {
-            throw new BusinessException("\u65e0\u6548\u7684\u72b6\u6001\u503c");
-        }
-
-        if (status == 4 && oldStatus != 4) {
-            LambdaQueryWrapper<OrderItem> itemWrapper = new LambdaQueryWrapper<>();
-            itemWrapper.eq(OrderItem::getOrderId, orderId);
-            List<OrderItem> items = orderItemMapper.selectList(itemWrapper);
-            for (OrderItem item : items) {
-                Product product = productMapper.selectById(item.getProductId());
-                if (product != null) {
-                    int currentReserved = product.getReservedStock() != null ? product.getReservedStock() : 0;
-                    product.setReservedStock(Math.max(0, currentReserved - item.getQuantity()));
-                    productMapper.updateById(product);
-                }
-                LambdaQueryWrapper<StockOut> soWrapper = new LambdaQueryWrapper<>();
-                soWrapper.eq(StockOut::getOrderId, orderId);
-                stockOutMapper.delete(soWrapper);
-            }
-        }
-
         order.setStatus(status);
         orderMapper.updateById(order);
-        }
+    }
 
     @Override
     @Transactional
@@ -232,7 +184,35 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         order.setShippingTime(LocalDateTime.now());
         order.setStatus(2);
         orderMapper.updateById(order);
+    }
+
+    @Override
+    @Transactional
+    public void cancelOrder(Long orderId, Long operatorId) {
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            throw new BusinessException("\u8ba2\u5355\u4e0d\u5b58\u5728");
         }
+        if (order.getStatus() >= 2) {
+            throw new BusinessException("\u5df2\u53d1\u8d27\u7684\u8ba2\u5355\u4e0d\u80fd\u53d6\u6d88");
+        }
+
+        LambdaQueryWrapper<OrderItem> itemWrapper = new LambdaQueryWrapper<>();
+        itemWrapper.eq(OrderItem::getOrderId, orderId);
+        List<OrderItem> items = orderItemMapper.selectList(itemWrapper);
+
+        for (OrderItem item : items) {
+            Product product = productMapper.selectById(item.getProductId());
+            if (product != null) {
+                int currentReserved = product.getReservedStock() != null ? product.getReservedStock() : 0;
+                product.setReservedStock(Math.max(0, currentReserved - item.getQuantity()));
+                productMapper.updateById(product);
+            }
+        }
+
+        order.setStatus(4);
+        orderMapper.updateById(order);
+    }
 
     @Override
     public OrderVO getOrderDetail(Long orderId) {
@@ -265,6 +245,12 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         LambdaQueryWrapper<OrderItem> itemWrapper = new LambdaQueryWrapper<>();
         itemWrapper.eq(OrderItem::getOrderId, orderId);
         List<OrderItem> items = orderItemMapper.selectList(itemWrapper);
+        for (OrderItem item : items) {
+            Product product = productMapper.selectById(item.getProductId());
+            if (product != null) {
+                item.setProductName(product.getName());
+            }
+        }
         vo.setItems(items);
 
         return vo;

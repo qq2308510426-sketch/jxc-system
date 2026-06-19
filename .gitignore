@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 **/node_modules/
 
@@ -29,3 +29,28 @@ Thumbs.db
 # Temp files
 *.tmp
 *.swp
+
+# Environment variables (SENSITIVE - never commit)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Application config with secrets
+# If your application.yml contains real passwords, uncomment:
+# **/application.yml
+
+# Tesseract trained data (large files, install separately)
+*.traineddata
+
+# Office documents
+*.docx
+*.pptx
+
+# Upload directory
+uploads/
+ssl/
+backups/
+nginx-conf/
+*-output.log
+package-lock.json

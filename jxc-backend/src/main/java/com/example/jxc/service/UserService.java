@@ -7,7 +7,7 @@ import java.util.Map;
 
 public interface UserService extends IService<User> {
 
-    Map<String, Object> login(String username, String password);
+    Map<String, Object> login(String username, String password, String ip);
 
     void updateUser(User user);
     void changePassword(Long userId, String oldPassword, String newPassword);

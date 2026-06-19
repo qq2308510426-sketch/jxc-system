@@ -22,6 +22,8 @@ public class User {
 
     private Integer status;
 
+    private Long warehouseId;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

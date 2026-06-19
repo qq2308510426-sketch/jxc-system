@@ -10,60 +10,56 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.StringJoiner;
 
-/**
- * CSV export utility using IO streams (key exam requirement).
- */
 public class CsvExportUtil {
 
     private CsvExportUtil() {
     }
 
-    /**
-     * Export data as CSV file to HttpServletResponse.
-     *
-     * @param response HTTP response
-     * @param fileName file name without extension
-     * @param headers  column headers
-     * @param rows     data rows, each row is a String array
-     */
+    private static String sanitizeCell(String cell) {
+        if (cell == null) return "";
+        String trimmed = cell.trim();
+        if (trimmed.isEmpty()) return "";
+        char first = trimmed.charAt(0);
+        if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r' || first == '\n') {
+            return "'" + trimmed;
+        }
+        if (trimmed.contains("\"") || trimmed.contains(",") || trimmed.contains("\n") || trimmed.contains("\r")) {
+            return "\"" + trimmed.replace("\"", "\"\"") + "\"";
+        }
+        return trimmed;
+    }
+
     public static void export(HttpServletResponse response, String fileName,
                               String[] headers, List<String[]> rows) throws IOException {
-        // 1. Set response content type
         response.setContentType("text/csv; charset=UTF-8");
-        // 2. Set Content-Disposition header for download
         response.setHeader("Content-Disposition",
                 "attachment; filename=" + fileName + ".csv");
 
         OutputStream outputStream = response.getOutputStream();
 
-        // 3. Write BOM bytes for Excel Chinese compatibility
         outputStream.write(0xEF);
         outputStream.write(0xBB);
         outputStream.write(0xBF);
 
-        // 4. Create BufferedWriter wrapping OutputStreamWriter wrapping output stream
         try (BufferedWriter writer = new BufferedWriter(
                 new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
 
-            // 5. Write headers joined by comma
             StringJoiner headerJoiner = new StringJoiner(",");
             for (String header : headers) {
-                headerJoiner.add(header);
+                headerJoiner.add(sanitizeCell(header));
             }
             writer.write(headerJoiner.toString());
             writer.newLine();
 
-            // 6. Write each row joined by comma
             for (String[] row : rows) {
                 StringJoiner rowJoiner = new StringJoiner(",");
                 for (String cell : row) {
-                    rowJoiner.add(cell != null ? cell : "");
+                    rowJoiner.add(sanitizeCell(cell));
                 }
                 writer.write(rowJoiner.toString());
                 writer.newLine();
             }
 
-            // 7. Flush
             writer.flush();
         }
     }

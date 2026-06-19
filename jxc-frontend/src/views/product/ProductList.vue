@@ -112,6 +112,7 @@
 </template>
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import request from '@/api/request'
 
 const keyword = ref('')
@@ -149,6 +150,7 @@ const openDialog = (row) => {
 
 const handleSubmit = async () => {
   if (!form.name) return
+  if (!form.price || form.price <= 0) { ElMessage.warning('售价不可为0'); return }
   submitting.value = true
   try {
     if (form.id) { await request.put('/product', form) } else { await request.post('/product', form) }
@@ -158,7 +160,7 @@ const handleSubmit = async () => {
 }
 
 const handleDelete = async (id) => {
-  if (!confirm('确定删除该商品吗？')) return
+  if (!confirm('确定删除该商品吗？\n\n删除后将清空该商品的所有入库、出库、批次等记录，且不可恢复！')) return
   try { await request.delete('/product/' + id); loadData() } catch (err) { /* handled */ }
 }
 

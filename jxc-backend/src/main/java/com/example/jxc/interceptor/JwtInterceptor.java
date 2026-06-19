@@ -1,5 +1,6 @@
 package com.example.jxc.interceptor;
 
+import com.example.jxc.config.TokenBlacklist;
 import com.example.jxc.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +18,9 @@ public class JwtInterceptor implements HandlerInterceptor {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private TokenBlacklist tokenBlacklist;
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
@@ -27,16 +31,23 @@ public class JwtInterceptor implements HandlerInterceptor {
         if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\":401,\"message\":\"未提供认证令牌\"}");
+            response.getWriter().write("{\"code\":401,\"message\":\"\u672a\u63d0\u4f9b\u8ba4\u8bc1\u4ee4\u724c\"}");
             return false;
         }
 
         String token = authHeader.substring(BEARER_PREFIX.length());
 
+        if (tokenBlacklist.isBlacklisted(token)) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("{\"code\":401,\"message\":\"\u4ee4\u724c\u5df2\u5931\u6548\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\"}");
+            return false;
+        }
+
         if (!jwtUtil.isTokenValid(token)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\":401,\"message\":\"无效的认证令牌\"}");
+            response.getWriter().write("{\"code\":401,\"message\":\"\u65e0\u6548\u7684\u8ba4\u8bc1\u4ee4\u724c\"}");
             return false;
         }
 

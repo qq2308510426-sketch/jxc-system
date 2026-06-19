@@ -53,7 +53,7 @@ class OrderControllerTest {
         admin.setUsername("admin");
         admin.setPassword(new BCryptPasswordEncoder().encode("admin123"));
         admin.setRealName("Admin");
-        admin.setRole("admin");
+        admin.setRole("super_admin");
         admin.setStatus(1);
         userMapper.insert(admin);
 

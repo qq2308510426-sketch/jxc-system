@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="space-y-6">
     <div>
       <h2 class="text-lg font-semibold text-slate-900">操作日志</h2>
@@ -54,11 +54,16 @@
       <div class="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
         <span class="text-sm text-slate-500">共 {{ total }} 条</span>
         <div class="flex items-center gap-1">
-          <button v-for="p in totalPages" :key="p" @click="currentPage = p; loadData()"
-            class="w-8 h-8 rounded-lg text-sm font-medium transition-colors"
-            :class="p === currentPage ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'">
-            {{ p }}
-          </button>
+          <button @click="goPage(currentPage - 1)" :disabled="currentPage <= 1" class="w-8 h-8 rounded-lg text-sm font-medium transition-colors text-slate-600 hover:bg-slate-100 disabled:opacity-30">&lt;</button>
+          <template v-for="p in visiblePages" :key="p">
+            <span v-if="p === '...'" class="w-8 h-8 flex items-center justify-center text-sm text-slate-400">...</span>
+            <button v-else @click="goPage(p)"
+              class="w-8 h-8 rounded-lg text-sm font-medium transition-colors"
+              :class="p === currentPage ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'">
+              {{ p }}
+            </button>
+          </template>
+          <button @click="goPage(currentPage + 1)" :disabled="currentPage >= totalPages" class="w-8 h-8 rounded-lg text-sm font-medium transition-colors text-slate-600 hover:bg-slate-100 disabled:opacity-30">&gt;</button>
         </div>
       </div>
     </div>
@@ -74,6 +79,24 @@ const total = ref(0)
 const currentPage = ref(1)
 const pageSize = ref(15)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
+const visiblePages = computed(() => {
+  const pages = []
+  const total = totalPages.value
+  const current = currentPage.value
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i)
+  } else {
+    pages.push(1)
+    if (current > 3) pages.push('...')
+    for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+      pages.push(i)
+    }
+    if (current < total - 2) pages.push('...')
+    pages.push(total)
+  }
+  return pages
+})
+const goPage = (p) => { if (p >= 1 && p <= totalPages.value) { currentPage.value = p; loadData() } }
 
 const filters = ref({
   action: '',

@@ -29,14 +29,14 @@
       <div class="border-t border-slate-100 pt-4 mb-4"><h3 class="text-sm font-semibold text-slate-900">订单明细</h3></div>
       <table class="w-full">
         <thead><tr class="border-b border-slate-100">
-          <th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">商品ID</th>
+          <th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">商品名称</th>
           <th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">数量</th>
           <th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">单价</th>
           <th class="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">小计</th>
         </tr></thead>
         <tbody class="divide-y divide-slate-50">
           <tr v-for="item in order.items||[]" :key="item.id">
-            <td class="px-4 py-2 text-sm text-slate-600">{{item.productId}}</td>
+            <td class="px-4 py-2 text-sm text-slate-600">{{item.productName || item.productId}}</td>
             <td class="px-4 py-2 text-sm text-slate-900">{{item.quantity}}</td>
             <td class="px-4 py-2 text-sm text-slate-600">¥{{item.unitPrice}}</td>
             <td class="px-4 py-2 text-sm font-medium text-slate-900">¥{{item.subtotal}}</td>

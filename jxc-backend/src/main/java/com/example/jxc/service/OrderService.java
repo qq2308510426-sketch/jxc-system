@@ -18,5 +18,8 @@ public interface OrderService extends IService<Order> {
     Page<Order> listPage(int pageNum, int pageSize, Integer status, Long customerId);
 
     List<Order> getPendingOrders(Long customerId);
+
     void shipOrder(Long orderId, String shippingNo, String shippingCompany);
+
+    void cancelOrder(Long orderId, Long operatorId);
 }

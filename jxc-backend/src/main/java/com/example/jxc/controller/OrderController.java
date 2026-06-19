@@ -5,6 +5,7 @@ import com.example.jxc.aspect.OperationLog;
 import com.example.jxc.common.PageResult;
 import com.example.jxc.common.Result;
 import com.example.jxc.dto.OrderCreateDTO;
+import com.example.jxc.dto.ShipOrderDTO;
 import com.example.jxc.entity.Order;
 import com.example.jxc.service.OrderService;
 import com.example.jxc.util.PrintUtil;
@@ -16,7 +17,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/order")
@@ -57,8 +57,8 @@ public class OrderController {
 
     @OperationLog(action = "\u8ba2\u5355\u53d1\u8d27")
     @PutMapping("/{id}/ship")
-    public Result<Void> ship(@PathVariable Long id, @RequestBody Map<String, String> params) {
-        orderService.shipOrder(id, params.get("shippingNo"), params.get("shippingCompany"));
+    public Result<Void> ship(@PathVariable Long id, @Valid @RequestBody ShipOrderDTO dto) {
+        orderService.shipOrder(id, dto.getShippingNo(), dto.getShippingCompany());
         return Result.success();
     }
 

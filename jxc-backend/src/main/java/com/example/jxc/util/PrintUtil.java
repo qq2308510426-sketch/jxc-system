@@ -1,13 +1,21 @@
 package com.example.jxc.util;
 
-import com.example.jxc.entity.Order;
-import com.example.jxc.entity.OrderItem;
 import com.example.jxc.vo.OrderVO;
+import com.example.jxc.entity.OrderItem;
 
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public class PrintUtil {
+
+    private static String escapeHtml(String input) {
+        if (input == null) return "";
+        return input.replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\"", "&quot;")
+                    .replace("'", "&#39;");
+    }
 
     public static String generateOrderPrintHtml(OrderVO order, List<OrderItem> items) {
         StringBuilder html = new StringBuilder();
@@ -22,17 +30,17 @@ public class PrintUtil {
         html.append("</style></head><body>");
 
         html.append("<div class='header'>");
-        html.append("<h2>销售订单</h2>");
+        html.append("<h2>\u9500\u552e\u8ba2\u5355</h2>");
         html.append("</div>");
 
         html.append("<div class='info'>");
-        html.append("<p>订单号: ").append(order.getOrderNo()).append("</p>");
-        html.append("<p>客户名称: ").append(order.getCustomerName() != null ? order.getCustomerName() : "").append("</p>");
-        html.append("<p>创建时间: ").append(order.getCreateTime() != null ? order.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) : "").append("</p>");
+        html.append("<p>\u8ba2\u5355\u53f7: ").append(escapeHtml(order.getOrderNo())).append("</p>");
+        html.append("<p>\u5ba2\u6237\u540d\u79f0: ").append(escapeHtml(order.getCustomerName())).append("</p>");
+        html.append("<p>\u521b\u5efa\u65f6\u95f4: ").append(order.getCreateTime() != null ? order.getCreateTime().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")) : "").append("</p>");
         html.append("</div>");
 
         html.append("<table>");
-        html.append("<tr><th>商品ID</th><th>数量</th><th>单价</th><th>小计</th></tr>");
+        html.append("<tr><th>\u5546\u54c1ID</th><th>\u6570\u91cf</th><th>\u5355\u4ef7</th><th>\u5c0f\u8ba1</th></tr>");
 
         for (OrderItem item : items) {
             html.append("<tr>");
@@ -44,8 +52,8 @@ public class PrintUtil {
         }
 
         html.append("</table>");
-        html.append("<p><strong>合计金额: ").append(order.getTotalAmount()).append("</strong></p>");
-        html.append("<p>备注: ").append(order.getRemark() != null ? order.getRemark() : "").append("</p>");
+        html.append("<p><strong>\u5408\u8ba1\u91d1\u989d: ").append(order.getTotalAmount()).append("</strong></p>");
+        html.append("<p>\u5907\u6ce8: ").append(escapeHtml(order.getRemark())).append("</p>");
 
         html.append("</body></html>");
         return html.toString();

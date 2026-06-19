@@ -1,10 +1,7 @@
-server:
-  port: 8081
-
 spring:
   datasource:
     driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=MySQL
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DB_CLOSE_DELAY=-1
     username: sa
     password:
   sql:
@@ -20,5 +17,18 @@ mybatis-plus:
       id-type: auto
 
 jwt:
-  secret: test-secret-key-for-unit-tests-must-be-256-bits-long
+  secret: test-jwt-secret-key-for-unit-testing-only
   expiration: 86400000
+
+cors:
+  allowed-origins: http://localhost:5173
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logging:
+  level:
+    com.example.jxc: WARN

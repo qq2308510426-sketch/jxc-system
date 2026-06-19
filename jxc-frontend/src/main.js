@@ -1,3 +1,4 @@
+import { setupErrorReporting } from '@/utils/errorReporter'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
@@ -17,4 +18,5 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
+setupErrorReporting()
 app.mount('#app')

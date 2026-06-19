@@ -15,131 +15,145 @@ const routes = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/Dashboard.vue'),
-        meta: { title: '\u9996\u9875\u4eea\u8868\u76d8' }
+        meta: { title: '首页仪表盘' }
       },
       {
         path: 'user',
         name: 'UserList',
         component: () => import('@/views/user/UserList.vue'),
-        meta: { title: '\u7528\u6237\u7ba1\u7406' }
+        meta: { title: '用户管理' }
       },
       {
         path: 'product',
         name: 'ProductList',
         component: () => import('@/views/product/ProductList.vue'),
-        meta: { title: '\u5546\u54c1\u7ba1\u7406' }
+        meta: { title: '商品管理' }
       },
       {
         path: 'category',
         name: 'CategoryList',
         component: () => import('@/views/category/CategoryList.vue'),
-        meta: { title: '\u5206\u7c7b\u7ba1\u7406' }
+        meta: { title: '分类管理' }
       },
       {
         path: 'supplier',
         name: 'SupplierList',
         component: () => import('@/views/supplier/SupplierList.vue'),
-        meta: { title: '\u4f9b\u5e94\u5546\u7ba1\u7406' }
+        meta: { title: '供应商管理' }
       },
       {
         path: 'customer',
         name: 'CustomerList',
         component: () => import('@/views/customer/CustomerList.vue'),
-        meta: { title: '\u5ba2\u6237\u7ba1\u7406' }
+        meta: { title: '客户管理' }
       },
       {
         path: 'stock/in',
         name: 'StockIn',
         component: () => import('@/views/stock/StockIn.vue'),
-        meta: { title: '\u5165\u5e93\u64cd\u4f5c' }
+        meta: { title: '入库操作' }
       },
       {
         path: 'stock/out',
         name: 'StockOut',
         component: () => import('@/views/stock/StockOut.vue'),
-        meta: { title: '\u51fa\u5e93\u64cd\u4f5c' }
+        meta: { title: '出库操作' }
       },
       {
         path: 'stock/list',
         name: 'StockList',
         component: () => import('@/views/stock/StockList.vue'),
-        meta: { title: '\u5e93\u5b58\u76d8\u70b9' }
+        meta: { title: '库存盘点' }
       },
       {
         path: 'product-batch',
         name: 'ProductBatch',
         component: () => import('@/views/product/ProductBatch.vue'),
-        meta: { title: '\u6279\u6b21\u7ba1\u7406' }
+        meta: { title: '批次管理' }
       },
-      { path: 'warehouse',
+      {
+        path: 'warehouse',
         name: 'WarehouseList',
         component: () => import('@/views/warehouse/WarehouseList.vue'),
-        meta: { title: '\u4ed3\u5e93\u7ba1\u7406' }
+        meta: { title: '仓库管理' }
       },
-      { path: 'stock/history',
+      {
+        path: 'stock/history',
         name: 'StockHistory',
         component: () => import('@/views/stock/StockHistory.vue'),
-        meta: { title: '\u51fa\u5165\u5e93\u8bb0\u5f55' }
+        meta: { title: '出入库记录' }
       },
       {
         path: 'order',
         name: 'OrderList',
         component: () => import('@/views/order/OrderList.vue'),
-        meta: { title: '\u8ba2\u5355\u7ba1\u7406' }
+        meta: { title: '订单管理' }
       },
       {
         path: 'order/create',
         name: 'OrderCreate',
         component: () => import('@/views/order/OrderCreate.vue'),
-        meta: { title: '\u521b\u5efa\u8ba2\u5355' }
+        meta: { title: '创建订单' }
       },
       {
         path: 'order/:id',
         name: 'OrderDetail',
         component: () => import('@/views/order/OrderDetail.vue'),
-        meta: { title: '\u8ba2\u5355\u8be6\u60c5' }
+        meta: { title: '订单详情' }
       },
       {
         path: 'return',
         name: 'ReturnList',
         component: () => import('@/views/order/ReturnList.vue'),
-        meta: { title: '\u9000\u8d27\u6362\u8d27' }
+        meta: { title: '退换货' }
       },
       {
         path: 'report/sales',
         name: 'SalesReport',
         component: () => import('@/views/report/SalesReport.vue'),
-        meta: { title: '\u9500\u552e\u62a5\u8868' }
+        meta: { title: '销售报表' }
       },
       {
         path: 'report/stock',
         name: 'StockReport',
         component: () => import('@/views/report/StockReport.vue'),
-        meta: { title: '\u5e93\u5b58\u62a5\u8868' }
+        meta: { title: '库存报表' }
       },
       {
         path: 'payment',
         name: 'PaymentList',
         component: () => import('@/views/payment/PaymentList.vue'),
-        meta: { title: '\u4ed8\u6b3e\u8bb0\u5f55' }
+        meta: { title: '付款记录' }
+      },
+      {
+        path: 'purchase-order',
+        name: 'PurchaseOrderList',
+        component: () => import('@/views/purchase/PurchaseOrderList.vue'),
+        meta: { title: '采购管理' }
+      },
+      {
+        path: 'account',
+        name: 'AccountList',
+        component: () => import('@/views/account/AccountList.vue'),
+        meta: { title: '应收应付' }
       },
       {
         path: 'data',
         name: 'DataImportExport',
         component: () => import('@/views/DataImportExport.vue'),
-        meta: { title: '\u6570\u636e\u5bfc\u5165\u5bfc\u51fa' }
+        meta: { title: '数据导入导出' }
       },
       {
         path: 'notification',
         name: 'Notification',
         component: () => import('@/views/Notification.vue'),
-        meta: { title: '\u6d88\u606f\u4e2d\u5fc3' }
+        meta: { title: '消息中心' }
       },
       {
         path: 'log',
         name: 'LogList',
         component: () => import('@/views/log/LogList.vue'),
-        meta: { title: '\u64cd\u4f5c\u65e5\u5fd7' }
+        meta: { title: '操作日志' }
       }
     ]
   }

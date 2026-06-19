@@ -1,25 +1,213 @@
 <template>
   <div class="space-y-6">
-    <div class="flex items-center justify-between"><div><h2 class="text-lg font-semibold text-slate-900">用户管理</h2><p class="text-sm text-slate-500 mt-0.5">管理系统用户</p></div><button @click="openDialog()" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>新增用户</button></div>
-    <div class="bg-white rounded-xl border border-slate-200 p-4"><div class="flex items-center gap-3"><input v-model="keyword" placeholder="搜索用户名..." class="flex-1 h-10 px-4 rounded-lg border border-slate-200 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" @keyup.enter="loadData" /><button @click="loadData" class="h-10 px-4 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors">搜索</button></div></div>
-    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div class="overflow-x-auto"><table class="w-full"><thead><tr class="border-b border-slate-100 bg-slate-50"><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">#</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">用户名</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">真实姓名</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">角色</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">状态</th><th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">操作</th></tr></thead><tbody class="divide-y divide-slate-50"><tr v-for="(row,idx) in tableData" :key="row.id" class="hover:bg-slate-50 transition-colors"><td class="px-4 py-3 text-sm text-slate-500">{{(currentPage-1)*pageSize+idx+1}}</td><td class="px-4 py-3 text-sm font-medium text-slate-900">{{row.username}}</td><td class="px-4 py-3 text-sm text-slate-600">{{row.realName}}</td><td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="row.role==='admin'?'bg-rose-50 text-rose-700':'bg-slate-100 text-slate-600'">{{roleMap[row.role]||row.role}}</span></td><td class="px-4 py-3"><span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="row.status===1?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-600'">{{row.status===1?'启用':'禁用'}}</span></td><td class="px-4 py-3"><div class="flex items-center gap-2"><button @click="openDialog(row)" class="text-sm text-slate-600 hover:text-slate-900">编辑</button><button @click="handleDelete(row.id)" class="text-sm text-red-500 hover:text-red-700">删除</button></div></td></tr><tr v-if="!tableData.length"><td colspan="6" class="px-4 py-12 text-center text-sm text-slate-400">暂无数据</td></tr></tbody></table></div>
-      <div class="px-4 py-3 border-t border-slate-100 flex items-center justify-between"><span class="text-sm text-slate-500">共 {{total}} 条</span><div class="flex items-center gap-1"><button v-for="p in totalPages" :key="p" @click="handlePageChange(p)" class="w-8 h-8 rounded-lg text-sm font-medium transition-colors" :class="p===currentPage?'bg-slate-900 text-white':'text-slate-600 hover:bg-slate-100'">{{p}}</button></div></div>
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-slate-900">用户管理</h2>
+        <p class="text-sm text-slate-500 mt-0.5">管理系统用户和角色权限</p>
+      </div>
+      <button v-if="user.hasPermission('user:create')" @click="openDialog()" class="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors">
+        + 新增用户
+      </button>
     </div>
-    <Teleport to="body"><div v-if="dialogVisible" class="fixed inset-0 z-50 flex items-center justify-center"><div class="absolute inset-0 bg-black/50" @click="dialogVisible=false"></div><div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4"><div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between"><h3 class="text-base font-semibold text-slate-900">{{form.id?'编辑用户':'新增用户'}}</h3><button @click="dialogVisible=false" class="text-slate-400 hover:text-slate-600"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button></div><div class="p-6 space-y-4"><div><label class="block text-sm font-medium text-slate-700 mb-1.5">用户名 <span class="text-red-500">*</span></label><input v-model="form.username" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" :disabled="!!form.id" /></div><div><label class="block text-sm font-medium text-slate-700 mb-1.5">{{form.id?'新密码（留空不修改）':'密码'}} <span v-if="!form.id" class="text-red-500">*</span></label><input v-model="form.password" type="password" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" /></div><div class="grid grid-cols-2 gap-4"><div><label class="block text-sm font-medium text-slate-700 mb-1.5">真实姓名</label><input v-model="form.realName" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" /></div><div><label class="block text-sm font-medium text-slate-700 mb-1.5">角色</label><select v-model="form.role" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent bg-white"><option value="admin">管理员</option><option value="user">普通用户</option></select></div></div></div><div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3"><button @click="dialogVisible=false" class="h-9 px-4 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">取消</button><button @click="handleSubmit" :disabled="submitting" class="h-9 px-4 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-50 transition-colors">{{submitting?'保存中...':'确定'}}</button></div></div></div></Teleport>
+
+    <!-- Search -->
+    <div class="bg-white rounded-xl border border-slate-200 p-4">
+      <div class="flex items-center gap-3">
+        <input v-model="keyword" placeholder="搜索用户名..." class="flex-1 h-10 px-4 rounded-lg border border-slate-200 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent" @keyup.enter="loadData" />
+        <button @click="loadData" class="h-10 px-4 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200">搜索</button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full">
+          <thead>
+            <tr class="border-b border-slate-100 bg-slate-50">
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500">#</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500">用户名</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500">真实姓名</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500">角色</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500">关联仓库</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500">状态</th>
+              <th class="px-4 py-3 text-left text-xs font-medium text-slate-500">操作</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-50">
+            <tr v-for="(row,idx) in tableData" :key="row.id" class="hover:bg-slate-50">
+              <td class="px-4 py-3 text-sm text-slate-500">{{ (currentPage-1)*pageSize+idx+1 }}</td>
+              <td class="px-4 py-3 text-sm font-medium text-slate-900">{{ row.username }}</td>
+              <td class="px-4 py-3 text-sm text-slate-600">{{ row.realName }}</td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="roleClass(row.role)">
+                  {{ row.roleLabel || roleMap[row.role] || row.role }}
+                </span>
+              </td>
+              <td class="px-4 py-3 text-sm text-slate-600">{{ getWarehouseName(row.warehouseId) }}</td>
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="row.status===1?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-600'">
+                  {{ row.status===1?'启用':'禁用' }}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <button v-if="user.hasPermission('user:edit')" @click="openDialog(row)" class="text-sm text-slate-600 hover:text-slate-900">编辑</button>
+                  <button v-if="user.hasPermission('user:delete')" @click="handleDelete(row.id)" class="text-sm text-red-500 hover:text-red-700">删除</button>
+                </div>
+              </td>
+            </tr>
+            <tr v-if="!tableData.length"><td colspan="7" class="px-4 py-12 text-center text-sm text-slate-400">暂无数据</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+        <span class="text-sm text-slate-500">共 {{ total }} 条</span>
+        <div class="flex items-center gap-1">
+          <button v-for="p in totalPages" :key="p" @click="handlePageChange(p)" class="w-8 h-8 rounded-lg text-sm font-medium transition-colors" :class="p===currentPage?'bg-slate-900 text-white':'text-slate-600 hover:bg-slate-100'">{{ p }}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dialog -->
+    <Teleport to="body">
+      <div v-if="dialogVisible" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="dialogVisible=false"></div>
+        <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4">
+          <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="text-base font-semibold text-slate-900">{{ form.id ? '编辑用户' : '新增用户' }}</h3>
+            <button @click="dialogVisible=false" class="text-slate-400 hover:text-slate-600">✕</button>
+          </div>
+          <div class="p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1.5">用户名 <span class="text-red-500">*</span></label>
+              <input v-model="form.username" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" :disabled="!!form.id" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1.5">{{ form.id ? '新密码（留空不修改）' : '密码' }} <span v-if="!form.id" class="text-red-500">*</span></label>
+              <input v-model="form.password" type="password" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1.5">真实姓名</label>
+                <input v-model="form.realName" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1.5">角色 <span class="text-red-500">*</span></label>
+                <select v-model="form.role" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white">
+                  <option v-for="(label, key) in roleMap" :key="key" :value="key">{{ label }}</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-700 mb-1.5">关联仓库</label>
+              <select v-model="form.warehouseId" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white">
+                <option value="">不限（全部仓库）</option>
+                <option v-for="w in warehouses" :key="w.id" :value="w.id">{{ w.name }}</option>
+              </select>
+              <p class="text-xs text-slate-400 mt-1">设置后该用户只能查看该仓库的数据</p>
+            </div>
+            <div v-if="form.id">
+              <label class="block text-sm font-medium text-slate-700 mb-1.5">状态</label>
+              <select v-model="form.status" class="w-full h-10 px-3 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white">
+                <option :value="1">启用</option>
+                <option :value="0">禁用</option>
+              </select>
+            </div>
+          </div>
+          <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3">
+            <button @click="dialogVisible=false" class="h-9 px-4 rounded-lg border border-slate-200 text-sm font-medium text-slate-700 hover:bg-slate-50">取消</button>
+            <button @click="handleSubmit" :disabled="submitting" class="h-9 px-4 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-50">{{ submitting ? '保存中...' : '确定' }}</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
+
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import request from '@/api/request'
-const keyword = ref(''); const tableData = ref([]); const total = ref(0); const currentPage = ref(1); const pageSize = ref(10); const dialogVisible = ref(false); const submitting = ref(false)
-const roleMap = { admin: '管理员', user: '普通用户' }
+import { useUserStore } from '@/stores/user'
+
+const user = useUserStore()
+const keyword = ref('')
+const tableData = ref([])
+const total = ref(0)
+const currentPage = ref(1)
+const pageSize = ref(10)
+const dialogVisible = ref(false)
+const submitting = ref(false)
+const warehouses = ref([])
+
+const roleMap = {
+  super_admin: '超级管理员',
+  warehouse_admin: '仓库管理员',
+  purchaser: '采购员',
+  salesperson: '销售员',
+  finance: '财务',
+  viewer: '查看者'
+}
+
+const roleClass = (role) => ({
+  'super_admin': 'bg-rose-50 text-rose-700',
+  'warehouse_admin': 'bg-amber-50 text-amber-700',
+  'purchaser': 'bg-blue-50 text-blue-700',
+  'salesperson': 'bg-emerald-50 text-emerald-700',
+  'finance': 'bg-purple-50 text-purple-700',
+  'viewer': 'bg-slate-100 text-slate-600'
+}[role] || 'bg-slate-100 text-slate-600')
+
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
-const form = reactive({ id: null, username: '', password: '', realName: '', role: 'user', status: 1 })
-const loadData = async () => { try { const res = await request.get('/user/list',{params:{keyword:keyword.value,pageNum:currentPage.value,pageSize:pageSize.value}}); tableData.value = res.data.rows||[]; total.value = res.data.total||0 } catch(e){} }
-const openDialog = (row) => { if(row) Object.assign(form,row,{password:''}); else Object.assign(form,{id:null,username:'',password:'',realName:'',role:'user',status:1}); dialogVisible.value = true }
-const handleSubmit = async () => { if(!form.username) return; submitting.value=true; try { if(form.id) { const data = {...form}; if(!data.password) delete data.password; await request.put('/user',data) } else await request.post('/user',form); dialogVisible.value = false; loadData() } catch(e){} finally { submitting.value=false } }
-const handleDelete = async (id) => { if(!confirm('确定删除？')) return; try { await request.delete('/user/'+id); loadData() } catch(e){} }
+const form = reactive({ id: null, username: '', password: '', realName: '', role: 'viewer', status: 1, warehouseId: '' })
+
+const getWarehouseName = (id) => warehouses.value.find(w => w.id === id)?.name || '不限'
+
+const loadData = async () => {
+  try {
+    const res = await request.get('/user/list', { params: { keyword: keyword.value, pageNum: currentPage.value, pageSize: pageSize.value } })
+    tableData.value = res.data.rows || []
+    total.value = res.data.total || 0
+  } catch(e) {}
+}
+
+const loadWarehouses = async () => {
+  try {
+    const res = await request.get('/warehouse/list', { params: { pageNum: 1, pageSize: 999 } })
+    warehouses.value = res.data?.rows || res.data || []
+  } catch(e) {}
+}
+
+const openDialog = (row) => {
+  if (row) {
+    Object.assign(form, row, { password: '' })
+  } else {
+    Object.assign(form, { id: null, username: '', password: '', realName: '', role: 'viewer', status: 1, warehouseId: '' })
+  }
+  dialogVisible.value = true
+}
+
+const handleSubmit = async () => {
+  if (!form.username) return
+  submitting.value = true
+  try {
+    if (form.id) {
+      const data = { ...form }
+      if (!data.password) delete data.password
+      await request.put('/user', data)
+    } else {
+      await request.post('/user', form)
+    }
+    dialogVisible.value = false
+    loadData()
+  } catch(e) {} finally { submitting.value = false }
+}
+
+const handleDelete = async (id) => {
+  if (!confirm('确定删除？')) return
+  try { await request.delete('/user/' + id); loadData() } catch(e) {}
+}
+
 const handlePageChange = (p) => { currentPage.value = p; loadData() }
-onMounted(() => loadData())
+
+onMounted(() => { loadData(); loadWarehouses() })
 </script>

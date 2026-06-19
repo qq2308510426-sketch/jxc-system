@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="space-y-6">
     <div class="flex items-center justify-between">
       <div><h2 class="text-lg font-semibold text-slate-900">仓库管理</h2><p class="text-sm text-slate-500 mt-0.5">管理所有仓库信息</p></div>
@@ -49,7 +49,7 @@ import request from '@/api/request'
 const tableData = ref([]); const total = ref(0); const currentPage = ref(1); const pageSize = ref(10); const dialogVisible = ref(false)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 const form = reactive({ id:null, name:'', address:'', contact:'', phone:'', status:1, remark:'' })
-const loadData = async (page=1) => { currentPage.value=page; try { const res = await request.get('/warehouse/list',{params:{pageNum:page,pageSize:pageSize.value}}); tableData.value=res.data?.rows||[]; total.value=res.data?.total||0 } catch(e){} }
+const loadData = async (page=1) => { currentPage.value=page; try { const res = await request.get('/warehouse/list',{params:{pageNum:page,pageSize:pageSize.value}}); const raw=res.data;tableData.value=Array.isArray(raw)?raw:(raw?.rows||[]); total.value=Array.isArray(raw)?raw.length:(raw?.total||0) } catch(e){} }
 const openDialog = (row) => { if(row) Object.assign(form,row); else Object.assign(form,{id:null,name:'',address:'',contact:'',phone:'',status:1,remark:''}); dialogVisible.value=true }
 const handleSubmit = async () => { if(!form.name) return; try { if(form.id) await request.put('/warehouse',form); else await request.post('/warehouse',form); dialogVisible.value=false; loadData() } catch(e){} }
 const handleDelete = async (id) => { if(!confirm('确定删除？')) return; try { await request.delete('/warehouse/'+id); loadData() } catch(e){} }

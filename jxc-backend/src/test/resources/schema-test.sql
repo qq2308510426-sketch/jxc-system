@@ -1,4 +1,8 @@
--- H2 compatible schema for testing (synced with schema.sql)
+-- H2 compatible schema for testing
+DROP TABLE IF EXISTS t_account_payable;
+DROP TABLE IF EXISTS t_account_receivable;
+DROP TABLE IF EXISTS t_purchase_order_item;
+DROP TABLE IF EXISTS t_purchase_order;
 DROP TABLE IF EXISTS t_inventory_check_item;
 DROP TABLE IF EXISTS t_inventory_check;
 DROP TABLE IF EXISTS t_product_stock;
@@ -25,8 +29,9 @@ CREATE TABLE t_user (
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(100) NOT NULL,
     real_name VARCHAR(50),
-    role VARCHAR(20) NOT NULL DEFAULT 'user',
+    role VARCHAR(20) NOT NULL DEFAULT 'viewer',
     status TINYINT NOT NULL DEFAULT 1,
+    warehouse_id BIGINT,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -93,10 +98,9 @@ CREATE TABLE t_product (
     safety_stock INT NOT NULL DEFAULT 0,
     supplier_id BIGINT,
     status TINYINT NOT NULL DEFAULT 1,
-    wholesale_price DECIMAL(10,2) DEFAULT NULL,
-    member_price DECIMAL(10,2) DEFAULT NULL,
     image_url VARCHAR(500) DEFAULT NULL,
     cost_price DECIMAL(10,2) DEFAULT NULL,
+    version INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -121,8 +125,7 @@ CREATE TABLE t_product_stock (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     product_id BIGINT NOT NULL,
     warehouse_id BIGINT NOT NULL,
-    stock INT DEFAULT 0,
-    reserved_stock INT DEFAULT 0,
+    quantity INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -134,6 +137,8 @@ CREATE TABLE t_stock_in (
     quantity INT NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
     operator_id BIGINT NOT NULL,
+    warehouse_id BIGINT,
+    batch_no VARCHAR(50),
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -145,6 +150,7 @@ CREATE TABLE t_stock_out (
     quantity INT NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
     operator_id BIGINT NOT NULL,
+    warehouse_id BIGINT,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -258,6 +264,73 @@ CREATE TABLE t_log (
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE t_purchase_order (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    order_no VARCHAR(50) NOT NULL UNIQUE,
+    supplier_id BIGINT NOT NULL,
+    total_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    status TINYINT NOT NULL DEFAULT 0,
+    paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    payment_status TINYINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    operator_id BIGINT NOT NULL,
+    approver_id BIGINT,
+    approve_time TIMESTAMP,
+    receive_time TIMESTAMP,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    deleted TINYINT DEFAULT 0
+);
+
+CREATE TABLE t_purchase_order_item (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    purchase_order_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    quantity INT NOT NULL,
+    unit_price DECIMAL(12,2) NOT NULL,
+    subtotal DECIMAL(12,2) NOT NULL,
+    received_quantity INT DEFAULT 0,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE t_account_receivable (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    customer_id BIGINT NOT NULL,
+    order_id BIGINT,
+    amount DECIMAL(12,2) NOT NULL,
+    paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    status TINYINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    due_date DATE,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE t_account_payable (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    supplier_id BIGINT NOT NULL,
+    purchase_order_id BIGINT,
+    amount DECIMAL(12,2) NOT NULL,
+    paid_amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+    status TINYINT NOT NULL DEFAULT 0,
+    remark VARCHAR(500),
+    due_date DATE,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Insert admin user (password: admin123, BCrypt)
 INSERT INTO t_user (username, password, real_name, role, status)
-VALUES ('admin', '$2a$10$HprFdIlZqldaZZ05mxKoEeaf8Llwe8kNtcgRp8WBDD6Rcv4NqaLRS', 'Admin', 'admin', 1);
+VALUES ('admin', '$2a$10$HprFdIlZqldaZZ05mxKoEeaf8Llwe8kNtcgRp8WBDD6Rcv4NqaLRS', 'Admin', 'super_admin', 1);
+
+-- Insert basic permissions for testing
+INSERT INTO t_role_permission (role, permission) VALUES
+('super_admin', 'product:view'), ('super_admin', 'product:create'),
+('super_admin', 'order:view'), ('super_admin', 'order:create'),
+('super_admin', 'user:view'), ('super_admin', 'user:create'),
+('super_admin', 'stock:view'), ('super_admin', 'stock:in'),
+('super_admin', 'report:view'),
+('salesperson', 'product:view'),
+('salesperson', 'order:view'), ('salesperson', 'order:create'),
+('salesperson', 'customer:view'), ('salesperson', 'customer:create'),
+('viewer', 'product:view'), ('viewer', 'order:view');

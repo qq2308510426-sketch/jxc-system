@@ -1,6 +1,7 @@
 package com.example.jxc.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.TableField;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -21,4 +22,7 @@ public class OrderItem {
     private BigDecimal unitPrice;
 
     private BigDecimal subtotal;
+
+    @TableField(exist = false)
+    private String productName;
 }

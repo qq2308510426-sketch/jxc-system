@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.jxc.common.PageResult;
 import com.example.jxc.common.Result;
 import com.example.jxc.entity.Notification;
+import com.example.jxc.exception.BusinessException;
 import com.example.jxc.service.NotificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,7 +55,11 @@ public class NotificationController {
     }
 
     @PostMapping("/check-stock")
-    public Result<Void> checkStockWarnings() {
+    public Result<Void> checkStockWarnings(HttpServletRequest request) {
+        String role = (String) request.getAttribute("role");
+        if (!"admin".equals(role)) {
+            throw new BusinessException("\u65e0\u6743\u64cd\u4f5c\uff0c\u4ec5\u7ba1\u7406\u5458\u53ef\u7528");
+        }
         notificationService.checkStockWarnings();
         return Result.success();
     }

@@ -35,6 +35,9 @@ public class Product {
 
     private Integer status;
 
+    @Version
+    private Integer version;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;
 

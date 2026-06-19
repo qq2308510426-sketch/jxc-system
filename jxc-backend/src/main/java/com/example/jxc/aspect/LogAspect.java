@@ -3,6 +3,8 @@ package com.example.jxc.aspect;
 import com.example.jxc.entity.Log;
 import com.example.jxc.mapper.LogMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
+import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
@@ -42,13 +44,11 @@ public class LogAspect {
         Long userId = userIdObj != null ? ((Number) userIdObj).longValue() : null;
         String ip = request.getRemoteAddr();
 
-        // Build detail with request parameters
         StringBuilder detailBuilder = new StringBuilder();
         if (operationLog.detail() != null && !operationLog.detail().isEmpty()) {
             detailBuilder.append(operationLog.detail());
         }
 
-        // Add request parameters
         try {
             Object[] args = joinPoint.getArgs();
             if (args != null && args.length > 0) {
@@ -56,14 +56,18 @@ public class LogAspect {
                 detailBuilder.append(" | \u53c2\u6570: ");
                 for (int i = 0; i < args.length; i++) {
                     if (paramNames != null && i < paramNames.length) {
-                        // Skip HttpServletRequest and HttpServletResponse
                         if (args[i] instanceof HttpServletRequest) continue;
-                        try {
-                            detailBuilder.append(paramNames[i]).append("=").append(objectMapper.writeValueAsString(args[i]));
-                            if (i < args.length - 1) detailBuilder.append(", ");
-                        } catch (Exception e) {
-                            detailBuilder.append(paramNames[i]).append("=[\u5e8f\u5217\u5316\u5931\u8d25]");
+                        String paramName = paramNames[i];
+                        if (isSensitiveParam(paramName)) {
+                            detailBuilder.append(paramName).append("=***");
+                        } else {
+                            try {
+                                detailBuilder.append(paramName).append("=").append(objectMapper.writeValueAsString(args[i]));
+                            } catch (Exception e) {
+                                detailBuilder.append(paramName).append("=[\u5e8f\u5217\u5316\u5931\u8d25]");
+                            }
                         }
+                        if (i < args.length - 1) detailBuilder.append(", ");
                     }
                 }
             }
@@ -80,27 +84,32 @@ public class LogAspect {
         log.setIp(ip);
         log.setCreateTime(LocalDateTime.now());
         logMapper.insert(log);
+    }
 
-        // Write to file
-        String logDir = "logs";
-        File dir = new File(logDir);
-        if (!dir.exists()) {
-            dir.mkdirs();
+    private String maskSensitiveJson(String json) {
+        if (json == null) return json;
+        String[] fields = {"password", "oldPassword", "newPassword", "confirmPassword"};
+        for (String field : fields) {
+            String search = "\"" + field + "\"";
+            int idx = 0;
+            while ((idx = json.toLowerCase().indexOf(search.toLowerCase(), idx)) != -1) {
+                int colonIdx = json.indexOf(":", idx + search.length());
+                if (colonIdx == -1) break;
+                int quoteStart = json.indexOf("\"", colonIdx + 1);
+                if (quoteStart == -1) break;
+                int quoteEnd = json.indexOf("\"", quoteStart + 1);
+                if (quoteEnd == -1) break;
+                json = json.substring(0, quoteStart + 1) + "***" + json.substring(quoteEnd);
+                idx = quoteStart + 4;
+            }
         }
+        return json;
+    }
 
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
-        String logContent = String.format("[%s] userId=%s, action=%s, detail=%s, ip=%s",
-                timestamp,
-                userId != null ? userId.toString() : "null",
-                operationLog.action(),
-                detail,
-                ip);
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(logDir + "/operation.log", true))) {
-            writer.write(logContent);
-            writer.newLine();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+    private boolean isSensitiveParam(String paramName) {
+        String lower = paramName.toLowerCase();
+        return lower.contains("password") || lower.contains("passwd")
+            || lower.contains("secret") || lower.contains("token")
+            || lower.contains("oldpassword") || lower.contains("newpassword");
     }
 }
