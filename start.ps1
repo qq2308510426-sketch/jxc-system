@@ -1,11 +1,11 @@
-$ProjectDir = "C:\claude\ja"
+﻿$ProjectDir = "C:\claude\ja"
 $BackendJar = "$ProjectDir\jxc-backend\target\jxc-backend-1.0.0.jar"
 $NgrokPath = "$ProjectDir\temp\ngrok\ngrok.exe"
 $Repo = "qq2308510426-sketch/jxc-system"
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  JXC 进销存 - 一键启动" -ForegroundColor Cyan
+Write-Host "  JXC - 一键启动" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -18,7 +18,7 @@ if (-not (Test-Path $BackendJar)) {
 }
 
 # 2. Kill old 8080
-$existing = Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue
+$existing = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue
 if ($existing) {
     Write-Host "[*] 关闭旧进程..." -ForegroundColor Yellow
     Stop-Process -Id $existing[0].OwningProcess -Force -ErrorAction SilentlyContinue
@@ -27,19 +27,28 @@ if ($existing) {
 
 # 3. Start backend
 Write-Host "[*] 启动后端..." -ForegroundColor Yellow
-$env:SPRING_PROFILES_ACTIVE = "prod"
-$env:DB_URL = "jdbc:mysql://gateway01.eu-central-1.prod.aws.tidbcloud.com:4000/jxc_db?useSSL=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true"
+$env:DB_URL = 'jdbc:mysql://gateway01.eu-central-1.prod.aws.tidbcloud.com:4000/jxc_db?useSSL=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8&allowPublicKeyRetrieval=true'
 $env:DB_USERNAME = "3PpHnK6HsZBmz7C.root"
 $env:DB_PASSWORD = "aGgfvbOqiyy4XdfC"
 $env:JWT_SECRET = "jxc-secure-key-2026-production-use-at-least-32"
 $env:CORS_ORIGINS = "*"
 $env:SERVER_PORT = "8080"
-Start-Process -FilePath "java" -ArgumentList "-Xms128m -Xmx256m -jar $BackendJar" -RedirectStandardOutput "$ProjectDir\backend.log" -RedirectStandardError "$ProjectDir\backend-err.log" -NoNewWindow
+Start-Process -FilePath "java" -ArgumentList "-Xms128m -Xmx256m -jar `"$BackendJar`"" -RedirectStandardOutput "$ProjectDir\backend.log" -RedirectStandardError "$ProjectDir\backend-err.log" -NoNewWindow
 
 Write-Host "[*] 等待后端启动..." -ForegroundColor Yellow
+$backendOk = $false
 for ($i = 0; $i -lt 30; $i += 2) {
     Start-Sleep -Seconds 2
-    try { $h = Invoke-RestMethod -Uri "http://localhost:8080/actuator/health" -TimeoutSec 2; if ($h.status -eq "UP") { Write-Host "[OK] 后端启动成功" -ForegroundColor Green; break } } catch {}
+    try {
+        $h = Invoke-RestMethod -Uri "http://localhost:8080/actuator/health" -TimeoutSec 2
+        if ($h.status -eq "UP") { Write-Host "[OK] 后端启动成功" -ForegroundColor Green; $backendOk = $true; break }
+    } catch {}
+}
+if (-not $backendOk) {
+    Write-Host "[X] 后端启动超时，请检查日志" -ForegroundColor Red
+    Get-Content "$ProjectDir\backend-err.log" -Tail 10 -ErrorAction SilentlyContinue
+    pause
+    exit 1
 }
 
 # 4. Start ngrok
@@ -53,10 +62,18 @@ if (-not $nr) {
 # 5. Get ngrok URL
 $ngrokUrl = ""
 for ($i = 0; $i -lt 10; $i++) {
-    try { $t = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -TimeoutSec 3; $ngrokUrl = $t.tunnels[0].public_url; if ($ngrokUrl) { break } } catch {}
+    try {
+        $t = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -TimeoutSec 3
+        $ngrokUrl = $t.tunnels[0].public_url
+        if ($ngrokUrl) { break }
+    } catch {}
     Start-Sleep -Seconds 2
 }
-if (-not $ngrokUrl) { Write-Host "[X] ngrok 失败"; pause; exit 1 }
+if (-not $ngrokUrl) {
+    Write-Host "[X] ngrok 获取地址失败" -ForegroundColor Red
+    pause
+    exit 1
+}
 $apiUrl = "$ngrokUrl/api"
 Write-Host "[OK] 穿透地址: $ngrokUrl" -ForegroundColor Green
 

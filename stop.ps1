@@ -1,41 +1,30 @@
-﻿$ErrorActionPreference = "SilentlyContinue"
-
-Write-Host ""
-Write-Host "============================================"
-Write-Host "   JXC Management System - Stop Script"
-Write-Host "============================================"
+﻿Write-Host ""
+Write-Host "========================================" -ForegroundColor Yellow
+Write-Host "  JXC 停止服务" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Yellow
 Write-Host ""
 
-Write-Host "Stopping services..." -ForegroundColor Cyan
-
-foreach ($port in @(8080, 5173)) {
-    $conns = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
-    foreach ($c in $conns) {
-        $procId = $c.OwningProcess
-        if ($procId -gt 0) {
-            $name = (Get-Process -Id $procId -ErrorAction SilentlyContinue).ProcessName
-            Write-Host "  Stopping PID $procId ($name) on port $port"
-            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
-        }
-    }
-}
-
-Start-Sleep -Seconds 2
-
-$remaining = @()
-foreach ($port in @(8080, 5173)) {
-    if (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue) {
-        $remaining += $port
-    }
-}
-
-if ($remaining.Count -eq 0) {
-    Write-Host ""
-    Write-Host "  All services stopped!" -ForegroundColor Green
+# Stop Java backend
+$javaProcs = Get-Process -Name "java" -ErrorAction SilentlyContinue
+if ($javaProcs) {
+    Write-Host "[*] 关闭后端..." -ForegroundColor Yellow
+    $javaProcs | Stop-Process -Force
+    Write-Host "[OK] 后端已关闭" -ForegroundColor Green
 } else {
-    Write-Host ""
-    Write-Host "  Warning: ports still in use: $($remaining -join ', ')" -ForegroundColor Yellow
+    Write-Host "[*] 后端未运行" -ForegroundColor Gray
+}
+
+# Stop ngrok
+$ngrokProcs = Get-Process -Name "ngrok" -ErrorAction SilentlyContinue
+if ($ngrokProcs) {
+    Write-Host "[*] 关闭内网穿透..." -ForegroundColor Yellow
+    $ngrokProcs | Stop-Process -Force
+    Write-Host "[OK] 内网穿透已关闭" -ForegroundColor Green
+} else {
+    Write-Host "[*] 内网穿透未运行" -ForegroundColor Gray
 }
 
 Write-Host ""
-Read-Host "Press Enter to close"
+Write-Host "所有服务已停止" -ForegroundColor Green
+Write-Host ""
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
