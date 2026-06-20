@@ -1,0 +1,23 @@
+﻿# Koyeb 部署配置
+# 使用方法: koyeb service init --docker dockerfile --app jxc --ports 8080:http
+# 或在 Koyeb Web UI 中配置
+
+services:
+  - name: jxc-backend
+    docker:
+      dockerfile: Dockerfile.backend
+    ports:
+      - port: 8080
+        protocol: http
+    env:
+      - name: SPRING_PROFILES_ACTIVE
+        value: prod
+      - name: SERVER_PORT
+        value: "8080"
+      - name: JAVA_OPTS
+        value: "-Xms128m -Xmx192m"
+      # 以下变量在 Koyeb 控制台设置为 Secret，不要提交到代码
+      # DB_URL, DB_USERNAME, DB_PASSWORD, JWT_SECRET, CORS_ORIGINS
+    instance_type: nano
+    regions:
+      - washington
