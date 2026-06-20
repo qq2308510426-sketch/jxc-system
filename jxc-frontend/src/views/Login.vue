@@ -116,9 +116,6 @@
           </button>
         </form>
 
-        <p class="mt-8 text-center text-xs text-slate-400">
-          管理员账号: admin / admin123
-        </p>
       </div>
     </div>
   </div>
