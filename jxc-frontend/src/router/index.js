@@ -15,7 +15,7 @@ const routes = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/Dashboard.vue'),
-        meta: { title: '首页仪表盘' }
+        meta: { title: '首页仪表�? }
       },
       {
         path: 'user',
@@ -39,7 +39,7 @@ const routes = [
         path: 'supplier',
         name: 'SupplierList',
         component: () => import('@/views/supplier/SupplierList.vue'),
-        meta: { title: '供应商管理' }
+        meta: { title: '供应商管�? }
       },
       {
         path: 'customer',
@@ -81,7 +81,7 @@ const routes = [
         path: 'stock/history',
         name: 'StockHistory',
         component: () => import('@/views/stock/StockHistory.vue'),
-        meta: { title: '出入库记录' }
+        meta: { title: '出入库记�? }
       },
       {
         path: 'order',
@@ -111,7 +111,7 @@ const routes = [
         path: 'report/sales',
         name: 'SalesReport',
         component: () => import('@/views/report/SalesReport.vue'),
-        meta: { title: '销售报表' }
+        meta: { title: '销售报�? }
       },
       {
         path: 'report/stock',
@@ -160,7 +160,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 
