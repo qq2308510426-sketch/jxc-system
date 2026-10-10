@@ -161,7 +161,7 @@ class StockControllerTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value(500));
     }
 }

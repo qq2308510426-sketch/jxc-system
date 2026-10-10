@@ -9,12 +9,14 @@ import com.example.jxc.entity.OrderItem;
 import com.example.jxc.exception.BusinessException;
 import com.example.jxc.mapper.OrderItemMapper;
 import com.example.jxc.entity.Product;
-import com.example.jxc.entity.StockOut;
+import com.example.jxc.dto.StockOperateDTO;
+import com.example.jxc.entity.AccountReceivable;
+import com.example.jxc.mapper.AccountReceivableMapper;
+import com.example.jxc.service.StockService;
 import com.example.jxc.mapper.OrderMapper;
 import com.example.jxc.mapper.ProductMapper;
 import com.example.jxc.mapper.CustomerMapper;
 import com.example.jxc.entity.Customer;
-import com.example.jxc.mapper.StockOutMapper;
 import com.example.jxc.service.OrderService;
 import com.example.jxc.vo.OrderVO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,10 +44,13 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private ProductMapper productMapper;
 
     @Autowired
-    private StockOutMapper stockOutMapper;
+    private CustomerMapper customerMapper;
 
     @Autowired
-    private CustomerMapper customerMapper;
+    private AccountReceivableMapper accountReceivableMapper;
+
+    @Autowired
+    private StockService stockService;
 
     private String generateOrderNo() {
         String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -109,7 +114,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             }
 
             product.setReservedStock((product.getReservedStock() != null ? product.getReservedStock() : 0) + itemDTO.getQuantity());
-            productMapper.updateById(product);
+            if (productMapper.updateById(product) == 0) {
+                throw new BusinessException("库存已被其他操作修改，请重试");
+            }
         }
     }
 
@@ -120,13 +127,28 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (order == null) {
             throw new BusinessException("\u8ba2\u5355\u4e0d\u5b58\u5728");
         }
+
+        // 取消必须连同预留库存一起回滚，统一交给 cancelOrder 处理
+        if (status == 4) {
+            cancelOrder(orderId, null);
+            return;
+        }
+
+        int from = order.getStatus();
+        boolean allowed = (from == 0 && status == 1)
+                || (from == 2 && status == 3);
+        if (!allowed) {
+            throw new BusinessException("\u975e\u6cd5\u7684\u8ba2\u5355\u72b6\u6001\u6d41\u8f6c\uff1a" + from + " -> " + status
+                    + "\uff1b\u53d6\u6d88\u8ba2\u5355\u8bf7\u4f7f\u7528\u53d6\u6d88\u529f\u80fd\uff0c\u5df2\u53d1\u8d27\u8ba2\u5355\u9700\u8d70\u9000\u8d27\u6d41\u7a0b");
+        }
+
         order.setStatus(status);
         orderMapper.updateById(order);
     }
 
     @Override
     @Transactional
-    public void shipOrder(Long orderId, String shippingNo, String shippingCompany) {
+    public void shipOrder(Long orderId, String shippingNo, String shippingCompany, Long operatorId) {
         Order order = orderMapper.selectById(orderId);
         if (order == null) {
             throw new BusinessException("\u8ba2\u5355\u4e0d\u5b58\u5728");
@@ -140,42 +162,21 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         List<OrderItem> items = orderItemMapper.selectList(itemWrapper);
 
         for (OrderItem item : items) {
+            StockOperateDTO out = new StockOperateDTO();
+            out.setProductId(item.getProductId());
+            out.setQuantity(item.getQuantity());
+            out.setUnitPrice(item.getUnitPrice());
+            out.setCustomerId(order.getCustomerId());
+            out.setOrderId(order.getId());
+            // 出库流水、总库存、分仓台账与成本结转统一由库存服务处理，避免两套口径
+            stockService.stockOut(out, operatorId);
+
             Product product = productMapper.selectById(item.getProductId());
-            if (product == null) {
-                throw new BusinessException("\u5546\u54c1\u4e0d\u5b58\u5728: " + item.getProductId());
-            }
-
-            if (product.getStock() < item.getQuantity()) {
-                throw new BusinessException("\u5546\u54c1\u5e93\u5b58\u4e0d\u8db3: " + product.getName()
-                    + " \u5f53\u524d\u5e93\u5b58: " + product.getStock());
-            }
-
-            product.setStock(product.getStock() - item.getQuantity());
             int currentReserved = product.getReservedStock() != null ? product.getReservedStock() : 0;
             product.setReservedStock(Math.max(0, currentReserved - item.getQuantity()));
-
-            if (product.getCostPrice() == null) {
-                product.setCostPrice(item.getUnitPrice());
-            } else {
-                BigDecimal oldCost = product.getCostPrice();
-                int oldStock = product.getStock();
-                int newQty = item.getQuantity();
-                BigDecimal newCost = item.getUnitPrice();
-                BigDecimal totalValue = oldCost.multiply(BigDecimal.valueOf(oldStock))
-                    .add(newCost.multiply(BigDecimal.valueOf(newQty)));
-                product.setCostPrice(totalValue.divide(BigDecimal.valueOf(oldStock + newQty), 2, RoundingMode.HALF_UP));
+            if (productMapper.updateById(product) == 0) {
+                throw new BusinessException("\u5e93\u5b58\u5df2\u88ab\u5176\u4ed6\u64cd\u4f5c\u4fee\u6539\uff0c\u8bf7\u91cd\u8bd5");
             }
-
-            productMapper.updateById(product);
-
-            StockOut stockOut = new StockOut();
-            stockOut.setProductId(item.getProductId());
-            stockOut.setCustomerId(order.getCustomerId());
-            stockOut.setOrderId(order.getId());
-            stockOut.setQuantity(item.getQuantity());
-            stockOut.setUnitPrice(item.getUnitPrice());
-            stockOut.setOperatorId(order.getOperatorId());
-            stockOutMapper.insert(stockOut);
         }
 
         order.setShippingNo(shippingNo);
@@ -184,6 +185,16 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         order.setShippingTime(LocalDateTime.now());
         order.setStatus(2);
         orderMapper.updateById(order);
+
+        AccountReceivable receivable = new AccountReceivable();
+        receivable.setCustomerId(order.getCustomerId());
+        receivable.setOrderId(order.getId());
+        receivable.setAmount(order.getTotalAmount());
+        receivable.setPaidAmount(BigDecimal.ZERO);
+        receivable.setStatus(0);
+        receivable.setDueDate(LocalDate.now().plusDays(30));
+        receivable.setRemark("\u53d1\u8d27\u81ea\u52a8\u751f\u6210\uff1a" + order.getOrderNo());
+        accountReceivableMapper.insert(receivable);
     }
 
     @Override
@@ -193,8 +204,11 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         if (order == null) {
             throw new BusinessException("\u8ba2\u5355\u4e0d\u5b58\u5728");
         }
+        if (order.getStatus() == 4) {
+            throw new BusinessException("\u8ba2\u5355\u5df2\u53d6\u6d88");
+        }
         if (order.getStatus() >= 2) {
-            throw new BusinessException("\u5df2\u53d1\u8d27\u7684\u8ba2\u5355\u4e0d\u80fd\u53d6\u6d88");
+            throw new BusinessException("\u5df2\u53d1\u8d27\u7684\u8ba2\u5355\u4e0d\u80fd\u53d6\u6d88\uff0c\u8bf7\u8d70\u9000\u8d27\u6d41\u7a0b");
         }
 
         LambdaQueryWrapper<OrderItem> itemWrapper = new LambdaQueryWrapper<>();
@@ -206,7 +220,9 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             if (product != null) {
                 int currentReserved = product.getReservedStock() != null ? product.getReservedStock() : 0;
                 product.setReservedStock(Math.max(0, currentReserved - item.getQuantity()));
-                productMapper.updateById(product);
+                if (productMapper.updateById(product) == 0) {
+                    throw new BusinessException("\u5e93\u5b58\u5df2\u88ab\u5176\u4ed6\u64cd\u4f5c\u4fee\u6539\uff0c\u8bf7\u91cd\u8bd5");
+                }
             }
         }
 

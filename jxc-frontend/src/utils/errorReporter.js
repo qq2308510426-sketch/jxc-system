@@ -22,7 +22,8 @@ export function setupErrorReporting() {
 function reportError(data) {
   try {
     const token = localStorage.getItem('token')
-    fetch('/api/error/report', {
+    const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+    fetch(base + '/error/report', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

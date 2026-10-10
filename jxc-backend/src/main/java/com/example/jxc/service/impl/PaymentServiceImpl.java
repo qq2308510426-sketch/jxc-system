@@ -3,9 +3,11 @@ package com.example.jxc.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.jxc.entity.AccountReceivable;
 import com.example.jxc.entity.Order;
 import com.example.jxc.entity.Payment;
 import com.example.jxc.exception.BusinessException;
+import com.example.jxc.mapper.AccountReceivableMapper;
 import com.example.jxc.mapper.OrderMapper;
 import com.example.jxc.mapper.PaymentMapper;
 import com.example.jxc.service.PaymentService;
@@ -26,6 +28,9 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment> impl
     @Autowired
     private OrderMapper orderMapper;
 
+    @Autowired
+    private AccountReceivableMapper receivableMapper;
+
     @Override
     @Transactional
     public void createPayment(Long orderId, BigDecimal amount, String paymentMethod, String remark, Long operatorId) {
@@ -42,7 +47,8 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment> impl
             throw new BusinessException("\u4ed8\u6b3e\u91d1\u989d\u8d85\u8fc7\u5e94\u4ed8\u91d1\u989d: " + remaining);
         }
 
-        String paymentNo = "PAY" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")) + String.format("%04d", (int)(Math.random() * 10000));
+        String paymentNo = "PAY" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+            + java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
 
         Payment payment = new Payment();
         payment.setOrderId(orderId);
@@ -62,6 +68,27 @@ public class PaymentServiceImpl extends ServiceImpl<PaymentMapper, Payment> impl
             order.setPaymentStatus(1);
         }
         orderMapper.updateById(order);
+
+        // 同一笔收款同时核销该订单的应收账款，避免"付款记录"和"应收应付"两套账
+        LambdaQueryWrapper<AccountReceivable> arWrapper = new LambdaQueryWrapper<>();
+        arWrapper.eq(AccountReceivable::getOrderId, orderId)
+                 .ne(AccountReceivable::getStatus, 2)
+                 .orderByAsc(AccountReceivable::getCreateTime);
+        BigDecimal remain = amount;
+        for (AccountReceivable ar : receivableMapper.selectList(arWrapper)) {
+            if (remain.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+            BigDecimal outstanding = ar.getAmount().subtract(ar.getPaidAmount());
+            if (outstanding.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            BigDecimal applied = outstanding.min(remain);
+            ar.setPaidAmount(ar.getPaidAmount().add(applied));
+            remain = remain.subtract(applied);
+            ar.setStatus(ar.getPaidAmount().compareTo(ar.getAmount()) >= 0 ? 2 : 1);
+            receivableMapper.updateById(ar);
+        }
     }
 
     @Override

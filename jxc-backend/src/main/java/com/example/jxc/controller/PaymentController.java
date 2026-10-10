@@ -6,16 +6,15 @@ import com.example.jxc.aspect.OperationLog;
 import com.example.jxc.common.PageResult;
 import com.example.jxc.common.Result;
 import com.example.jxc.entity.Payment;
+import com.example.jxc.exception.BusinessException;
 import com.example.jxc.service.PaymentService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/payment")
@@ -47,16 +46,16 @@ public class PaymentController {
     public Result<Void> create(@RequestBody Map<String, Object> dto, HttpServletRequest request) {
         Long userId = ((Number) request.getAttribute("userId")).longValue();
         
-        Payment payment = new Payment();
-        String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String uuid = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
-        payment.setPaymentNo("PAY" + dateStr + uuid);
-        payment.setOrderId(Long.valueOf(dto.get("orderId").toString()));
-        payment.setAmount(new java.math.BigDecimal(dto.get("amount").toString()));
-        payment.setPaymentMethod((String) dto.getOrDefault("paymentMethod", "cash"));
-        payment.setRemark((String) dto.get("remark"));
-        payment.setOperatorId(userId);
-        paymentService.save(payment);
+        if (dto.get("orderId") == null || dto.get("amount") == null) {
+            throw new BusinessException("订单ID与金额不能为空");
+        }
+        // 落流水、推进订单已收金额、核销应收账款统一在服务层完成
+        paymentService.createPayment(
+            Long.valueOf(dto.get("orderId").toString()),
+            new BigDecimal(dto.get("amount").toString()),
+            (String) dto.getOrDefault("paymentMethod", "cash"),
+            (String) dto.get("remark"),
+            userId);
         
         return Result.success();
     }

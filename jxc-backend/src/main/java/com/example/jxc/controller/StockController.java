@@ -39,8 +39,10 @@ public class StockController {
     @GetMapping("/in/list")
     public Result<PageResult<StockIn>> listStockIn(
             @RequestParam(defaultValue = "1") int pageNum,
-            @RequestParam(defaultValue = "10") int pageSize) {
-        Page<StockIn> page = stockService.listStockIn(pageNum, pageSize);
+            @RequestParam(defaultValue = "10") int pageSize,
+            HttpServletRequest request) {
+        Long userId = ((Number) request.getAttribute("userId")).longValue();
+        Page<StockIn> page = stockService.listStockIn(pageNum, pageSize, userId);
         PageResult<StockIn> pageResult = new PageResult<>(page.getTotal(), page.getRecords());
         return Result.success(pageResult);
     }
@@ -48,8 +50,10 @@ public class StockController {
     @GetMapping("/out/list")
     public Result<PageResult<StockOut>> listStockOut(
             @RequestParam(defaultValue = "1") int pageNum,
-            @RequestParam(defaultValue = "10") int pageSize) {
-        Page<StockOut> page = stockService.listStockOut(pageNum, pageSize);
+            @RequestParam(defaultValue = "10") int pageSize,
+            HttpServletRequest request) {
+        Long userId = ((Number) request.getAttribute("userId")).longValue();
+        Page<StockOut> page = stockService.listStockOut(pageNum, pageSize, userId);
         PageResult<StockOut> pageResult = new PageResult<>(page.getTotal(), page.getRecords());
         return Result.success(pageResult);
     }

@@ -96,6 +96,33 @@ CREATE TABLE IF NOT EXISTS t_product (
 
 -- ==================== Business Tables ====================
 
+CREATE TABLE IF NOT EXISTS t_product_batch (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT NOT NULL,
+    batch_no VARCHAR(50) NOT NULL,
+    serial_no VARCHAR(100),
+    quantity INT DEFAULT 0,
+    production_date DATE,
+    expiry_date DATE,
+    supplier_id BIGINT,
+    purchase_price DECIMAL(10,2),
+    status INT DEFAULT 1 COMMENT '1=在库 2=已出清',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_batch_product (product_id),
+    INDEX idx_batch_no (batch_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='商品批次与效期';
+
+CREATE TABLE IF NOT EXISTS t_product_stock (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT NOT NULL,
+    warehouse_id BIGINT NOT NULL,
+    quantity INT DEFAULT 0,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_product_warehouse (product_id, warehouse_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='分仓库存台账';
+
 CREATE TABLE IF NOT EXISTS t_stock_in (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     product_id BIGINT NOT NULL,
@@ -118,6 +145,7 @@ CREATE TABLE IF NOT EXISTS t_stock_out (
     order_id BIGINT,
     quantity INT NOT NULL,
     unit_price DECIMAL(10,2) NOT NULL,
+    cost_price DECIMAL(10,2) COMMENT '出库时点结转成本',
     operator_id BIGINT NOT NULL,
     warehouse_id BIGINT,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -209,15 +237,17 @@ CREATE TABLE IF NOT EXISTS t_return (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     return_no VARCHAR(50) NOT NULL,
     order_id BIGINT,
-    customer_id BIGINT,
-    type INT DEFAULT 1,
-    status INT DEFAULT 0,
+    customer_id BIGINT COMMENT '销售退货/换货的客户',
+    supplier_id BIGINT COMMENT '采购退货(type=3)的供应商',
+    type INT DEFAULT 1 COMMENT '1退货 2换货 3采购退货',
+    status INT DEFAULT 0 COMMENT '0待处理 1已处理 2已拒绝',
     reason VARCHAR(500),
     total_amount DECIMAL(12,2) DEFAULT 0.00,
     operator_id BIGINT,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_order (order_id)
+    INDEX idx_order (order_id),
+    INDEX idx_return_supplier (supplier_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='退货单';
 
 CREATE TABLE IF NOT EXISTS t_return_item (
@@ -230,6 +260,29 @@ CREATE TABLE IF NOT EXISTS t_return_item (
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_return (return_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='退货明细';
+
+CREATE TABLE IF NOT EXISTS t_inventory_check (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    check_no VARCHAR(50) NOT NULL,
+    status TINYINT DEFAULT 0 COMMENT '0进行中 1已完成',
+    remark VARCHAR(500),
+    operator_id BIGINT,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_check_no (check_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='盘点单';
+
+CREATE TABLE IF NOT EXISTS t_inventory_check_item (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    check_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    system_stock INT DEFAULT 0,
+    actual_stock INT DEFAULT 0,
+    difference INT DEFAULT 0 COMMENT '账面-实盘，正数=盘亏，负数=盘盈',
+    remark VARCHAR(200),
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_check_id (check_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='盘点明细';
 
 CREATE TABLE IF NOT EXISTS t_account_receivable (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -270,6 +323,7 @@ CREATE TABLE IF NOT EXISTS t_role_permission (
     role VARCHAR(50) NOT NULL,
     permission VARCHAR(100) NOT NULL,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_role_permission (role, permission),
     INDEX idx_role (role)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色权限';
 
@@ -310,32 +364,6 @@ VALUES ('默认仓库', '总部仓库', '管理员', 1)
 ON DUPLICATE KEY UPDATE name = name;
 
 -- Role permissions
-INSERT IGNORE INTO t_role_permission (role, permission) VALUES
-('super_admin', 'product:view'), ('super_admin', 'product:create'), ('super_admin', 'product:edit'), ('super_admin', 'product:delete'),
-('super_admin', 'category:view'), ('super_admin', 'category:create'), ('super_admin', 'category:edit'), ('super_admin', 'category:delete'),
-('super_admin', 'supplier:view'), ('super_admin', 'supplier:create'), ('super_admin', 'supplier:edit'), ('super_admin', 'supplier:delete'),
-('super_admin', 'customer:view'), ('super_admin', 'customer:create'), ('super_admin', 'customer:edit'), ('super_admin', 'customer:delete'),
-('super_admin', 'order:view'), ('super_admin', 'order:create'), ('super_admin', 'order:edit'), ('super_admin', 'order:delete'), ('super_admin', 'order:ship'),
-('super_admin', 'stock:view'), ('super_admin', 'stock:in'), ('super_admin', 'stock:out'), ('super_admin', 'stock:manage'),
-('super_admin', 'warehouse:view'), ('super_admin', 'warehouse:create'), ('super_admin', 'warehouse:edit'), ('super_admin', 'warehouse:delete'),
-('super_admin', 'purchase:view'), ('super_admin', 'purchase:create'), ('super_admin', 'purchase:approve'), ('super_admin', 'purchase:receive'),
-('super_admin', 'account:view'), ('super_admin', 'account:receivable'), ('super_admin', 'account:payable'),
-('super_admin', 'report:view'), ('super_admin', 'report:export'),
-('super_admin', 'user:view'), ('super_admin', 'user:create'), ('super_admin', 'user:edit'), ('super_admin', 'user:delete'),
-('super_admin', 'log:view'), ('super_admin', 'notification:view'), ('super_admin', 'data:import'), ('super_admin', 'data:export'),
-('warehouse_admin', 'product:view'), ('warehouse_admin', 'stock:view'), ('warehouse_admin', 'stock:in'), ('warehouse_admin', 'stock:out'), ('warehouse_admin', 'stock:manage'),
-('warehouse_admin', 'warehouse:view'), ('warehouse_admin', 'warehouse:edit'), ('warehouse_admin', 'purchase:view'), ('warehouse_admin', 'purchase:receive'),
-('warehouse_admin', 'report:view'), ('warehouse_admin', 'notification:view'),
-('purchaser', 'product:view'), ('purchaser', 'product:create'), ('purchaser', 'product:edit'),
-('purchaser', 'supplier:view'), ('purchaser', 'supplier:create'), ('purchaser', 'supplier:edit'),
-('purchaser', 'purchase:view'), ('purchaser', 'purchase:create'), ('purchaser', 'account:view'), ('purchaser', 'account:payable'),
-('purchaser', 'report:view'), ('purchaser', 'notification:view'),
-('salesperson', 'product:view'), ('salesperson', 'customer:view'), ('salesperson', 'customer:create'), ('salesperson', 'customer:edit'),
-('salesperson', 'order:view'), ('salesperson', 'order:create'), ('salesperson', 'order:edit'),
-('salesperson', 'account:view'), ('salesperson', 'account:receivable'), ('salesperson', 'report:view'), ('salesperson', 'notification:view'),
-('finance', 'product:view'), ('finance', 'customer:view'), ('finance', 'supplier:view'), ('finance', 'order:view'), ('finance', 'purchase:view'),
-('finance', 'account:view'), ('finance', 'account:receivable'), ('finance', 'account:payable'),
-('finance', 'report:view'), ('finance', 'report:export'), ('finance', 'notification:view'),
-('viewer', 'product:view'), ('viewer', 'category:view'), ('viewer', 'supplier:view'), ('viewer', 'customer:view'),
-('viewer', 'order:view'), ('viewer', 'stock:view'), ('viewer', 'warehouse:view'), ('viewer', 'purchase:view'),
-('viewer', 'account:view'), ('viewer', 'report:view'), ('viewer', 'notification:view');
+-- 六种角色共 114 条授权与代码中的权限串一一对应，唯一键 uk_role_permission 保证重复执行不会插入重复行。
+-- 请执行：jxc-backend/src/main/resources/init-permissions.sql
+--   mysql -u<user> -p jxc_db < jxc-backend/src/main/resources/init-permissions.sql

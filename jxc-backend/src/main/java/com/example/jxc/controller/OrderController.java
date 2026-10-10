@@ -57,8 +57,10 @@ public class OrderController {
 
     @OperationLog(action = "\u8ba2\u5355\u53d1\u8d27")
     @PutMapping("/{id}/ship")
-    public Result<Void> ship(@PathVariable Long id, @Valid @RequestBody ShipOrderDTO dto) {
-        orderService.shipOrder(id, dto.getShippingNo(), dto.getShippingCompany());
+    public Result<Void> ship(@PathVariable Long id, @Valid @RequestBody ShipOrderDTO dto,
+                             HttpServletRequest request) {
+        Long userId = ((Number) request.getAttribute("userId")).longValue();
+        orderService.shipOrder(id, dto.getShippingNo(), dto.getShippingCompany(), userId);
         return Result.success();
     }
 

@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -22,6 +24,7 @@ public class AccountServiceImpl implements AccountService {
     @Autowired private CustomerMapper customerMapper;
     @Autowired private SupplierMapper supplierMapper;
     @Autowired private OrderMapper orderMapper;
+    @Autowired private PaymentMapper paymentMapper;
 
     @Override
     public List<Map<String, Object>> getReceivableSummary() {
@@ -135,7 +138,7 @@ public class AccountServiceImpl implements AccountService {
 
     @Override
     @Transactional
-    public void receivePayment(AccountPaymentDTO dto) {
+    public void receivePayment(AccountPaymentDTO dto, Long operatorId) {
         AccountReceivable receivable = null;
         if (dto.getAccountId() != null) {
             receivable = receivableMapper.selectById(dto.getAccountId());
@@ -161,6 +164,27 @@ public class AccountServiceImpl implements AccountService {
         receivable.setPaidAmount(receivable.getPaidAmount().add(dto.getAmount()));
         receivable.setStatus(receivable.getPaidAmount().compareTo(receivable.getAmount()) >= 0 ? 2 : 1);
         receivableMapper.updateById(receivable);
+
+        // 收款同时生成一条收付款流水，并把订单的已收金额一起推进，保证三处数字同源
+        if (receivable.getOrderId() != null) {
+            Payment payment = new Payment();
+            payment.setOrderId(receivable.getOrderId());
+            payment.setPaymentNo("PAY" + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
+                + UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase());
+            payment.setAmount(dto.getAmount());
+            payment.setPaymentMethod("cash");
+            payment.setRemark(dto.getRemark() == null ? "\u5e94\u6536\u6838\u9500\u81ea\u52a8\u751f\u6210" : dto.getRemark());
+            payment.setOperatorId(operatorId);
+            paymentMapper.insert(payment);
+
+            Order order = orderMapper.selectById(receivable.getOrderId());
+            if (order != null) {
+                BigDecimal paid = (order.getPaidAmount() == null ? BigDecimal.ZERO : order.getPaidAmount()).add(dto.getAmount());
+                order.setPaidAmount(paid);
+                order.setPaymentStatus(paid.compareTo(order.getTotalAmount()) >= 0 ? 2 : 1);
+                orderMapper.updateById(order);
+            }
+        }
     }
 
     @Override

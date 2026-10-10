@@ -2,6 +2,7 @@ package com.example.jxc.aspect;
 
 import com.example.jxc.entity.Log;
 import com.example.jxc.mapper.LogMapper;
+import com.example.jxc.util.ClientIpUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
 import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
@@ -42,7 +43,7 @@ public class LogAspect {
 
         Object userIdObj = request.getAttribute("userId");
         Long userId = userIdObj != null ? ((Number) userIdObj).longValue() : null;
-        String ip = request.getRemoteAddr();
+        String ip = ClientIpUtil.getClientIp(request);
 
         StringBuilder detailBuilder = new StringBuilder();
         if (operationLog.detail() != null && !operationLog.detail().isEmpty()) {
@@ -62,7 +63,8 @@ public class LogAspect {
                             detailBuilder.append(paramName).append("=***");
                         } else {
                             try {
-                                detailBuilder.append(paramName).append("=").append(objectMapper.writeValueAsString(args[i]));
+                                detailBuilder.append(paramName).append("=")
+                                .append(maskSensitiveJson(objectMapper.writeValueAsString(args[i])));
                             } catch (Exception e) {
                                 detailBuilder.append(paramName).append("=[\u5e8f\u5217\u5316\u5931\u8d25]");
                             }

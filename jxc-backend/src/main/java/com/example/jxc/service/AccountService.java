@@ -16,7 +16,8 @@ public interface AccountService {
 
     List<Map<String, Object>> getPayableDetail(Long supplierId);
 
-    void receivePayment(AccountPaymentDTO dto);
+    /** 收款：核销应收并同步生成收付款流水与订单已收金额。 */
+    void receivePayment(AccountPaymentDTO dto, Long operatorId);
 
     void makePayment(AccountPaymentDTO dto);
 

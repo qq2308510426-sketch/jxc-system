@@ -4,17 +4,18 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.jxc.dto.PurchaseOrderCreateDTO;
+import com.example.jxc.dto.StockOperateDTO;
 import com.example.jxc.entity.*;
 import com.example.jxc.exception.BusinessException;
 import com.example.jxc.mapper.*;
 import com.example.jxc.service.PurchaseOrderService;
+import com.example.jxc.service.StockService;
 import com.example.jxc.vo.PurchaseOrderVO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -26,9 +27,9 @@ public class PurchaseOrderServiceImpl extends ServiceImpl<PurchaseOrderMapper, P
 
     @Autowired private PurchaseOrderMapper purchaseOrderMapper;
     @Autowired private PurchaseOrderItemMapper purchaseOrderItemMapper;
-    @Autowired private ProductMapper productMapper;
     @Autowired private SupplierMapper supplierMapper;
     @Autowired private AccountPayableMapper accountPayableMapper;
+    @Autowired private StockService stockService;
 
     private String generateOrderNo() {
         String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
@@ -113,28 +114,20 @@ public class PurchaseOrderServiceImpl extends ServiceImpl<PurchaseOrderMapper, P
         List<PurchaseOrderItem> items = purchaseOrderItemMapper.selectList(itemWrapper);
 
         for (PurchaseOrderItem item : items) {
-            Product product = productMapper.selectById(item.getProductId());
-            if (product == null) {
-                throw new BusinessException("\u5546\u54c1\u4e0d\u5b58\u5728: " + item.getProductId());
-            }
-
-            // Update product stock
-            int oldStock = product.getStock();
             int addQty = item.getQuantity();
-
-            if (product.getCostPrice() == null || oldStock == 0) {
-                product.setCostPrice(item.getUnitPrice());
-            } else {
-                BigDecimal totalValue = product.getCostPrice().multiply(BigDecimal.valueOf(oldStock))
-                    .add(item.getUnitPrice().multiply(BigDecimal.valueOf(addQty)));
-                product.setCostPrice(totalValue.divide(BigDecimal.valueOf(oldStock + addQty), 2, RoundingMode.HALF_UP));
+            if (addQty <= 0) {
+                continue;
             }
 
-            product.setStock(oldStock + addQty);
-            productMapper.updateById(product);
+            // 收货入库统一走库存服务：加权平均成本重算、入库流水、分仓台账与乐观锁校验一处完成
+            StockOperateDTO in = new StockOperateDTO();
+            in.setProductId(item.getProductId());
+            in.setSupplierId(order.getSupplierId());
+            in.setQuantity(addQty);
+            in.setUnitPrice(item.getUnitPrice());
+            stockService.stockIn(in, operatorId);
 
-            // Update received quantity
-            item.setReceivedQuantity(item.getQuantity());
+            item.setReceivedQuantity(addQty);
             purchaseOrderItemMapper.updateById(item);
         }
 

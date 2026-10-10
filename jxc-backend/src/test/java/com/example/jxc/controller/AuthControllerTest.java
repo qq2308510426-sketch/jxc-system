@@ -52,10 +52,12 @@ class AuthControllerTest {
     @Test
     void loginWithWrongPassword() throws Exception {
         Map<String, String> loginReq = Map.of("username", "admin", "password", "wrong");
+        // 业务异常由 GlobalExceptionHandler 统一转成 HTTP 400 + 响应体 code
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(loginReq)))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(500));
     }
 
     @Test

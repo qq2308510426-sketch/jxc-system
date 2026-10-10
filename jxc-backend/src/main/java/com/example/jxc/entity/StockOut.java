@@ -25,6 +25,9 @@ public class StockOut {
 
     private BigDecimal unitPrice;
 
+    /** 出库时点结转的加权平均成本，用于事后毛利核算 */
+    private BigDecimal costPrice;
+
     private Long operatorId;
 
     @TableField(fill = FieldFill.INSERT)

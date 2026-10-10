@@ -44,7 +44,7 @@
               <td class="px-4 py-3 text-sm font-medium">{{ row.returnNo }}</td>
               <td class="px-4 py-3">
                 <el-tag :type="row.type === 1 ? 'warning' : 'info'" size="small">
-                  {{ row.type === 1 ? '退货' : '换货' }}
+                  {{ row.type === 3 ? '采购退货' : (row.type === 1 ? '退货' : '换货') }}
                 </el-tag>
               </td>
               <td class="px-4 py-3 text-sm">¥{{ row.totalAmount }}</td>
@@ -73,12 +73,19 @@
             <el-select v-model="form.type" style="width:100%">
               <el-option :value="1" label="退货" />
               <el-option :value="2" label="换货" />
+              <el-option :value="3" label="采购退货" />
             </el-select>
           </div>
-          <div>
+          <div v-if="form.type !== 3">
             <label class="block text-sm font-medium mb-1.5">客户</label>
             <el-select v-model="form.customerId" filterable style="width:100%">
               <el-option v-for="c in customers" :key="c.id" :label="c.name" :value="c.id" />
+            </el-select>
+          </div>
+          <div v-else>
+            <label class="block text-sm font-medium mb-1.5">供应商</label>
+            <el-select v-model="form.supplierId" filterable style="width:100%">
+              <el-option v-for="sp in suppliers" :key="sp.id" :label="sp.name" :value="sp.id" />
             </el-select>
           </div>
         </div>
@@ -119,10 +126,12 @@ const statusFilter = ref('')
 const showCreateDialog = ref(false)
 const products = ref([])
 const customers = ref([])
+const suppliers = ref([])
 
 const form = reactive({
   type: 1,
   customerId: null,
+  supplierId: null,
   reason: '',
   items: [{ productId: null, quantity: 1, unitPrice: 0 }]
 })
@@ -138,17 +147,20 @@ const loadData = async () => {
 
 const loadOptions = async () => {
   try {
-    const [p, c] = await Promise.all([
+    const [p, c, sp] = await Promise.all([
       request.get('/product/list', { params: { pageNum: 1, pageSize: 999 } }),
-      request.get('/customer/list', { params: { pageNum: 1, pageSize: 999 } })
+      request.get('/customer/list', { params: { pageNum: 1, pageSize: 999 } }),
+      request.get('/supplier/list', { params: { pageNum: 1, pageSize: 999 } })
     ])
-    products.value = p.data?.rows || []
-    customers.value = c.data?.rows || []
+    products.value = p.data?.rows || p.data || []
+    customers.value = c.data?.rows || c.data || []
+    suppliers.value = sp.data?.rows || sp.data || []
   } catch (e) {}
 }
 
 const submitReturn = async () => {
-  if (!form.customerId) { ElMessage.warning('请选择客户'); return }
+  if (form.type !== 3 && !form.customerId) { ElMessage.warning('请选择客户'); return }
+  if (form.type === 3 && !form.supplierId) { ElMessage.warning('请选择供应商'); return }
   if (!form.items.length || !form.items[0].productId) { ElMessage.warning('请添加退货商品'); return }
   try {
     await request.post('/return', form)

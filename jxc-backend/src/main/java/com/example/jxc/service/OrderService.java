@@ -19,7 +19,7 @@ public interface OrderService extends IService<Order> {
 
     List<Order> getPendingOrders(Long customerId);
 
-    void shipOrder(Long orderId, String shippingNo, String shippingCompany);
+    void shipOrder(Long orderId, String shippingNo, String shippingCompany, Long operatorId);
 
     void cancelOrder(Long orderId, Long operatorId);
 }

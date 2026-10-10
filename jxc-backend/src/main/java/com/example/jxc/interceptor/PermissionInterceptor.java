@@ -22,6 +22,15 @@ public class PermissionInterceptor implements HandlerInterceptor {
         "/api/notification/unread-count"
     ));
 
+    /** 登录后即可使用的自助接口：个人信息、改自己密码、登出、前端错误上报，不需要额外授权。 */
+    private static final Set<String> SELF_PATHS = new HashSet<>(Arrays.asList(
+        "/api/auth/logout",
+        "/api/error/report",
+        "/api/user/info",
+        "/api/user/permissions",
+        "/api/user/change-password"
+    ));
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         String path = request.getRequestURI();
@@ -34,6 +43,10 @@ public class PermissionInterceptor implements HandlerInterceptor {
         if (role == null) {
             sendForbidden(response, "\u672a\u77e5\u89d2\u8272");
             return false;
+        }
+
+        if (SELF_PATHS.contains(path)) {
+            return true;
         }
 
         // Resolve required permission from path + method
@@ -64,6 +77,12 @@ public class PermissionInterceptor implements HandlerInterceptor {
     }
 
     private String resolvePermission(String path, String method) {
+        // --- Product Batch（必须排在 /api/product 之前，否则会被商品前缀吞掉）---
+        if (path.startsWith("/api/product-batch")) {
+            if ("POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method)) return "stock:manage";
+            return "stock:view";
+        }
+
         // --- Product ---
         if (path.startsWith("/api/product")) {
             if ("POST".equals(method)) return "product:create";
@@ -98,10 +117,10 @@ public class PermissionInterceptor implements HandlerInterceptor {
 
         // --- Order ---
         if (path.startsWith("/api/order")) {
+            if (path.contains("/ship")) return "order:ship";
             if ("POST".equals(method)) return "order:create";
             if ("PUT".equals(method)) return "order:edit";
             if ("DELETE".equals(method)) return "order:delete";
-            if (path.contains("/ship")) return "order:ship";
             return "order:view";
         }
 
@@ -134,12 +153,6 @@ public class PermissionInterceptor implements HandlerInterceptor {
             if ("PUT".equals(method)) return "warehouse:edit";
             if ("DELETE".equals(method)) return "warehouse:delete";
             return "warehouse:view";
-        }
-
-        // --- Product Batch ---
-        if (path.startsWith("/api/product-batch")) {
-            if ("POST".equals(method) || "PUT".equals(method) || "DELETE".equals(method)) return "stock:manage";
-            return "stock:view";
         }
 
         // --- Inventory Check ---

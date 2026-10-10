@@ -7,7 +7,6 @@ import com.example.jxc.common.PageResult;
 import com.example.jxc.common.Result;
 import com.example.jxc.entity.Return;
 import com.example.jxc.entity.ReturnItem;
-import com.example.jxc.exception.BusinessException;
 import com.example.jxc.mapper.ReturnItemMapper;
 import com.example.jxc.service.ReturnService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,11 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/return")
@@ -50,55 +47,47 @@ public class ReturnController {
     @PostMapping
     public Result<Void> create(@RequestBody Map<String, Object> dto, HttpServletRequest request) {
         Long userId = ((Number) request.getAttribute("userId")).longValue();
-        
+
         Return returnObj = new Return();
-        String dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        String uuid = UUID.randomUUID().toString().replace("-", "").substring(0, 6).toUpperCase();
-        returnObj.setReturnNo("RET" + dateStr + uuid);
-        returnObj.setType((Integer) dto.get("type"));
-        returnObj.setCustomerId(dto.get("customerId") != null ? Long.valueOf(dto.get("customerId").toString()) : null);
+        returnObj.setType(toInt(dto.get("type")));
+        returnObj.setCustomerId(toLong(dto.get("customerId")));
+        returnObj.setSupplierId(toLong(dto.get("supplierId")));
+        returnObj.setOrderId(toLong(dto.get("orderId")));
         returnObj.setReason((String) dto.get("reason"));
-        returnObj.setStatus(0);
         returnObj.setOperatorId(userId);
-        
-        // Calculate total from items
-        List<Map<String, Object>> items = (List<Map<String, Object>>) dto.get("items");
-        BigDecimal total = BigDecimal.ZERO;
-        if (items != null) {
-            for (Map<String, Object> item : items) {
-                BigDecimal price = new BigDecimal(item.get("unitPrice").toString());
-                int qty = (Integer) item.get("quantity");
-                total = total.add(price.multiply(BigDecimal.valueOf(qty)));
-            }
-        }
-        returnObj.setTotalAmount(total);
-        returnService.save(returnObj);
-        
-        // Save items
-        if (items != null) {
-            for (Map<String, Object> item : items) {
+
+        List<Map<String, Object>> rawItems = (List<Map<String, Object>>) dto.get("items");
+        List<ReturnItem> items = new ArrayList<>();
+        if (rawItems != null) {
+            for (Map<String, Object> item : rawItems) {
                 ReturnItem ri = new ReturnItem();
-                ri.setReturnId(returnObj.getId());
-                ri.setProductId(Long.valueOf(item.get("productId").toString()));
-                ri.setQuantity((Integer) item.get("quantity"));
-                ri.setUnitPrice(new BigDecimal(item.get("unitPrice").toString()));
-                ri.setSubtotal(ri.getUnitPrice().multiply(BigDecimal.valueOf(ri.getQuantity())));
-                returnItemMapper.insert(ri);
+                ri.setProductId(toLong(item.get("productId")));
+                ri.setQuantity(toInt(item.get("quantity")));
+                Object price = item.get("unitPrice");
+                ri.setUnitPrice(price == null ? null : new BigDecimal(price.toString()));
+                items.add(ri);
             }
         }
-        
+
+        // 单号、状态、金额与业务校验统一由服务层完成，避免两处生成规则不一致
+        returnService.createReturn(returnObj, items);
         return Result.success();
+    }
+
+    private static Integer toInt(Object v) {
+        return v == null ? null : Integer.valueOf(v.toString());
+    }
+
+    private static Long toLong(Object v) {
+        return v == null ? null : Long.valueOf(v.toString());
     }
 
     @OperationLog(action = "\u5904\u7406\u9000\u8d27\u5355")
     @PutMapping("/{id}/process")
-    public Result<Void> process(@PathVariable Long id, @RequestParam Integer status) {
-        Return returnObj = returnService.getById(id);
-        if (returnObj == null) {
-            throw new BusinessException("\u9000\u8d27\u5355\u4e0d\u5b58\u5728");
-        }
-        returnObj.setStatus(status);
-        returnService.updateById(returnObj);
+    public Result<Void> process(@PathVariable Long id, @RequestParam Integer status,
+                                HttpServletRequest request) {
+        Long userId = ((Number) request.getAttribute("userId")).longValue();
+        returnService.processReturn(id, status, userId);
         return Result.success();
     }
 

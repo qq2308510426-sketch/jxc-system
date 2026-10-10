@@ -18,6 +18,7 @@ public class Return {
     private Long orderId;
 
     private Long customerId;
+    private Long supplierId;
 
     private Integer type;
 

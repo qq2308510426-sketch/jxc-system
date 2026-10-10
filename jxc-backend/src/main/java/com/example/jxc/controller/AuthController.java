@@ -5,6 +5,7 @@ import com.example.jxc.common.Result;
 import com.example.jxc.config.TokenBlacklist;
 import com.example.jxc.dto.LoginDTO;
 import com.example.jxc.service.UserService;
+import com.example.jxc.util.ClientIpUtil;
 import com.example.jxc.util.JwtUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -33,7 +34,7 @@ public class AuthController {
     @OperationLog(action = "\u7528\u6237\u767b\u5f55", detail = "\u7528\u6237\u767b\u5f55\u7cfb\u7edf")
     @PostMapping("/login")
     public Result<Map<String, Object>> login(@Valid @RequestBody LoginDTO dto, HttpServletRequest request) {
-        String ip = getClientIp(request);
+        String ip = ClientIpUtil.getClientIp(request);
         Map<String, Object> data = userService.login(dto.getUsername(), dto.getPassword(), ip);
         return Result.success(data);
     }
@@ -49,17 +50,4 @@ public class AuthController {
         return Result.success();
     }
 
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
-    }
 }

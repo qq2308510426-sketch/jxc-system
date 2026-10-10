@@ -45,8 +45,10 @@ public class AccountController {
 
     @OperationLog(action = "\u6536\u6b3e\u786e\u8ba4")
     @PostMapping("/receivable/pay")
-    public Result<Void> receivePayment(@Valid @RequestBody AccountPaymentDTO dto) {
-        accountService.receivePayment(dto);
+    public Result<Void> receivePayment(@Valid @RequestBody AccountPaymentDTO dto,
+                                       jakarta.servlet.http.HttpServletRequest request) {
+        Long userId = ((Number) request.getAttribute("userId")).longValue();
+        accountService.receivePayment(dto, userId);
         return Result.success();
     }
 
