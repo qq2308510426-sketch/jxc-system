@@ -1,3 +1,5 @@
 @echo off
-powershell -ExecutionPolicy Bypass -File "C:\claude\ja\stop.ps1"
-if %errorlevel% neq 0 pause
+REM Stops the local backend/frontend and any cloudflared tunnels started by 启动服务.bat
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0stop.ps1" %*
+echo.
+pause

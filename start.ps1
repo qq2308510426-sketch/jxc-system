@@ -80,11 +80,22 @@ if (-not $SkipWeb) { Stop-PortListener $WebPort }
 $ApiPublicUrl = ""
 $WebPublicUrl = ""
 if ($Tunnel) {
+    # cloudflared 位置：显式参数 > 项目 tools > 常见 out/bin > PATH
     if (-not (Test-Path $CloudflaredPath)) {
-        Write-Host "[X] 未找到 cloudflared：$CloudflaredPath" -ForegroundColor Red
-        Write-Host "    可用 -CloudflaredPath 指定路径，或不加 -Tunnel 只在本机运行" -ForegroundColor Yellow
+        foreach ($cand in @((Join-Path $ProjectDir "tools\cloudflared\cloudflared.exe"),
+                            "C:\claude\out\bin\cloudflared.exe")) {
+            if (Test-Path $cand) { $CloudflaredPath = $cand; break }
+        }
+        if (-not (Test-Path $CloudflaredPath)) {
+            $onPath = Get-Command cloudflared.exe -ErrorAction SilentlyContinue
+            if ($onPath) { $CloudflaredPath = $onPath.Source }
+        }
+    }
+    if (-not (Test-Path $CloudflaredPath)) {
+        Write-Host "[X] 未找到 cloudflared，可用 -CloudflaredPath 指定路径，或不加 -Tunnel 只在本机运行" -ForegroundColor Red
         exit 1
     }
+    Write-Host "[*] 使用 cloudflared: $CloudflaredPath" -ForegroundColor DarkGray
     Get-Process -Name "cloudflared" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     Start-Sleep -Seconds 1
 
@@ -117,6 +128,9 @@ if ($Tunnel) {
     }
     Write-Host "[OK] 后端隧道: $ApiPublicUrl" -ForegroundColor Green
     Write-Host "[OK] 前端隧道: $WebPublicUrl" -ForegroundColor Green
+    # 隧道地址每次启动都会变，落一份文件，窗口关掉后还能查
+    ("{0}`tapi={1}`tweb={2}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $ApiPublicUrl, $WebPublicUrl) |
+        Out-File -FilePath (Join-Path $RunDir "public-urls.txt") -Encoding utf8
 }
 
 # CORS 只放行本机前端与当次隧道来源
