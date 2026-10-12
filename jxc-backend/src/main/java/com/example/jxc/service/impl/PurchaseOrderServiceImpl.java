@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -134,6 +135,18 @@ public class PurchaseOrderServiceImpl extends ServiceImpl<PurchaseOrderMapper, P
         order.setStatus(2);
         order.setReceiveTime(LocalDateTime.now());
         purchaseOrderMapper.updateById(order);
+
+        // 累计供应商单量与准时率：收货日与下单日之差落在供应商承诺的交货周期内记为准时
+        Supplier supplier = supplierMapper.selectById(order.getSupplierId());
+        if (supplier != null) {
+            supplier.setTotalOrders((supplier.getTotalOrders() == null ? 0 : supplier.getTotalOrders()) + 1);
+            long days = ChronoUnit.DAYS.between(order.getCreateTime().toLocalDate(), LocalDate.now());
+            int promised = supplier.getDeliveryDays() == null ? 7 : supplier.getDeliveryDays();
+            if (days <= promised) {
+                supplier.setOnTimeOrders((supplier.getOnTimeOrders() == null ? 0 : supplier.getOnTimeOrders()) + 1);
+            }
+            supplierMapper.updateById(supplier);
+        }
     }
 
     @Override

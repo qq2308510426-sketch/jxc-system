@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.AfterThrowing;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,16 @@ public class LogAspect {
 
     @AfterReturning(pointcut = "@annotation(com.example.jxc.aspect.OperationLog)", returning = "result")
     public void recordLog(JoinPoint joinPoint, Object result) {
+        record(joinPoint, null);
+    }
+
+    /** 写操作失败也要留痕：校验不通过、库存不足、被乐观锁挡下等，事后能查到是谁在什么时候试过。 */
+    @AfterThrowing(pointcut = "@annotation(com.example.jxc.aspect.OperationLog)", throwing = "ex")
+    public void recordFailure(JoinPoint joinPoint, Throwable ex) {
+        record(joinPoint, ex);
+    }
+
+    private void record(JoinPoint joinPoint, Throwable ex) {
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
         OperationLog operationLog = method.getAnnotation(OperationLog.class);
@@ -46,8 +57,11 @@ public class LogAspect {
         String ip = ClientIpUtil.getClientIp(request);
 
         StringBuilder detailBuilder = new StringBuilder();
+        if (ex != null) {
+            detailBuilder.append("[\u5931\u8d25] ").append(ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage());
+        }
         if (operationLog.detail() != null && !operationLog.detail().isEmpty()) {
-            detailBuilder.append(operationLog.detail());
+            detailBuilder.append(detailBuilder.length() > 0 ? " | " : "").append(operationLog.detail());
         }
 
         try {
@@ -81,7 +95,7 @@ public class LogAspect {
 
         Log log = new Log();
         log.setUserId(userId);
-        log.setAction(operationLog.action());
+        log.setAction(operationLog.action() + (ex != null ? "(\u5931\u8d25)" : ""));
         log.setDetail(detail);
         log.setIp(ip);
         log.setCreateTime(LocalDateTime.now());

@@ -1,7 +1,15 @@
 package com.example.jxc.controller;
 
+import com.example.jxc.aspect.OperationLog;
 import com.example.jxc.common.Result;
 import com.example.jxc.entity.Product;
+import com.example.jxc.entity.ProductStock;
+import com.example.jxc.entity.User;
+import com.example.jxc.entity.Warehouse;
+import com.example.jxc.mapper.ProductStockMapper;
+import com.example.jxc.mapper.UserMapper;
+import com.example.jxc.mapper.WarehouseMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import com.example.jxc.entity.Customer;
 import com.example.jxc.entity.Supplier;
 import com.example.jxc.exception.BusinessException;
@@ -35,6 +43,15 @@ public class DataImportExportController {
     @Autowired
     private SupplierService supplierService;
 
+    @Autowired
+    private UserMapper userMapper;
+
+    @Autowired
+    private WarehouseMapper warehouseMapper;
+
+    @Autowired
+    private ProductStockMapper productStockMapper;
+
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
         "text/csv", "text/plain", "application/vnd.ms-excel",
         "application/csv", "application/octet-stream"
@@ -51,6 +68,19 @@ public class DataImportExportController {
         if (filename == null || !filename.toLowerCase().endsWith(".csv")) {
             throw new BusinessException("\u4ec5\u652f\u6301CSV\u6587\u4ef6\u683c\u5f0f");
         }
+    }
+
+    /** 导入库存的归属仓库：操作人仓库 &gt; 系统唯一仓库 &gt; 无。 */
+    private Long resolveImportWarehouse(HttpServletRequest request) {
+        Object userIdObj = request == null ? null : request.getAttribute("userId");
+        if (userIdObj instanceof Number) {
+            User op = userMapper.selectById(((Number) userIdObj).longValue());
+            if (op != null && op.getWarehouseId() != null) {
+                return op.getWarehouseId();
+            }
+        }
+        List<Warehouse> all = warehouseMapper.selectList(null);
+        return all.size() == 1 ? all.get(0).getId() : null;
     }
 
     // ==================== Export ====================
@@ -111,8 +141,9 @@ public class DataImportExportController {
 
     // ==================== Import ====================
 
+    @OperationLog(action = "批量导入商品")
     @PostMapping("/import/products")
-    public Result<String> importProducts(@RequestParam("file") MultipartFile file) {
+    public Result<String> importProducts(@RequestParam("file") MultipartFile file, HttpServletRequest request) {
         validateFile(file);
         try {
             List<Product> products = new ArrayList<>();
@@ -139,7 +170,33 @@ public class DataImportExportController {
                 }
             }
             productService.saveBatch(products);
-            return Result.success("\u5bfc\u5165\u6210\u529f\uff0c\u5171\u5bfc\u5165 " + products.size() + " \u6761\u6570\u636e");
+
+            // \u5bfc\u5165\u7684\u5e93\u5b58\u5fc5\u987b\u6709\u4ed3\u5e93\u5f52\u5c5e\uff0c\u5426\u5219\u5206\u4ed3\u53f0\u8d26\u4e0e\u603b\u8d26\u5c31\u5bf9\u4e0d\u4e0a\uff1a
+            // \u53d6\u64cd\u4f5c\u4eba\u6240\u5c5e\u4ed3\u5e93\uff1b\u7cfb\u7edf\u53ea\u6709\u4e00\u4e2a\u4ed3\u5e93\u65f6\u53d6\u5b83\uff1b\u5224\u5b9a\u4e0d\u4e86\u5219\u628a\u5e93\u5b58\u7f6e 0 \u5e76\u63d0\u793a\u8d70\u5165\u5e93\u5355
+            Long warehouseId = resolveImportWarehouse(request);
+            int untracked = 0;
+            for (Product p : products) {
+                int qty = p.getStock() == null ? 0 : p.getStock();
+                if (qty <= 0) {
+                    continue;
+                }
+                if (warehouseId == null) {
+                    p.setStock(0);
+                    productService.updateById(p);
+                    untracked++;
+                    continue;
+                }
+                ProductStock ps = new ProductStock();
+                ps.setProductId(p.getId());
+                ps.setWarehouseId(warehouseId);
+                ps.setQuantity(qty);
+                productStockMapper.insert(ps);
+            }
+            String msg = "\u5bfc\u5165\u6210\u529f\uff0c\u5171\u5bfc\u5165 " + products.size() + " \u6761\u6570\u636e";
+            if (untracked > 0) {
+                msg += "\uff1b\u5176\u4e2d " + untracked + " \u6761\u7684\u5e93\u5b58\u56e0\u65e0\u6cd5\u786e\u5b9a\u4ed3\u5e93\u5df2\u7f6e 0\uff0c\u8bf7\u901a\u8fc7\u5165\u5e93\u5355\u767b\u8bb0";
+            }
+            return Result.success(msg);
         } catch (BusinessException e) {
             throw e;
         } catch (NumberFormatException e) {
@@ -149,6 +206,7 @@ public class DataImportExportController {
         }
     }
 
+    @OperationLog(action = "批量导入客户")
     @PostMapping("/import/customers")
     public Result<String> importCustomers(@RequestParam("file") MultipartFile file) {
         validateFile(file);
@@ -184,6 +242,7 @@ public class DataImportExportController {
         }
     }
 
+    @OperationLog(action = "批量导入供应商")
     @PostMapping("/import/suppliers")
     public Result<String> importSuppliers(@RequestParam("file") MultipartFile file) {
         validateFile(file);

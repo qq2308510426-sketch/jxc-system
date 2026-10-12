@@ -162,6 +162,17 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         List<OrderItem> items = orderItemMapper.selectList(itemWrapper);
 
         for (OrderItem item : items) {
+            // 先释放本单预留，让这部分库存重新变为可用，再走出库扣减（否则会被自己的预留挡住）
+            Product product = productMapper.selectById(item.getProductId());
+            if (product == null) {
+                throw new BusinessException("\u5546\u54c1\u4e0d\u5b58\u5728: " + item.getProductId());
+            }
+            int currentReserved = product.getReservedStock() != null ? product.getReservedStock() : 0;
+            product.setReservedStock(Math.max(0, currentReserved - item.getQuantity()));
+            if (productMapper.updateById(product) == 0) {
+                throw new BusinessException("\u5e93\u5b58\u5df2\u88ab\u5176\u4ed6\u64cd\u4f5c\u4fee\u6539\uff0c\u8bf7\u91cd\u8bd5");
+            }
+
             StockOperateDTO out = new StockOperateDTO();
             out.setProductId(item.getProductId());
             out.setQuantity(item.getQuantity());
@@ -170,13 +181,6 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
             out.setOrderId(order.getId());
             // 出库流水、总库存、分仓台账与成本结转统一由库存服务处理，避免两套口径
             stockService.stockOut(out, operatorId);
-
-            Product product = productMapper.selectById(item.getProductId());
-            int currentReserved = product.getReservedStock() != null ? product.getReservedStock() : 0;
-            product.setReservedStock(Math.max(0, currentReserved - item.getQuantity()));
-            if (productMapper.updateById(product) == 0) {
-                throw new BusinessException("\u5e93\u5b58\u5df2\u88ab\u5176\u4ed6\u64cd\u4f5c\u4fee\u6539\uff0c\u8bf7\u91cd\u8bd5");
-            }
         }
 
         order.setShippingNo(shippingNo);

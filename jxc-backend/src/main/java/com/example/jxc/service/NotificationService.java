@@ -10,6 +10,9 @@ public interface NotificationService extends IService<Notification> {
 
     void checkStockWarnings();
 
+    /** 扫描临期与已过效期的在库批次，生成站内通知（7 天内到期视为临期）。 */
+    void checkBatchExpiry();
+
     Page<Notification> listPage(int pageNum, int pageSize, Long userId, Integer isRead);
 
     void markAsRead(Long id);

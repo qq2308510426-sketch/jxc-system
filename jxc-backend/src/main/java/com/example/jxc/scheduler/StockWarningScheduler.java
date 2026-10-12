@@ -17,4 +17,9 @@ public class StockWarningScheduler {
     public void checkStockWarnings() {
         notificationService.checkStockWarnings();
     }
+
+    @Scheduled(cron = "0 0 9 * * ?")
+    public void checkBatchExpiry() {
+        notificationService.checkBatchExpiry();
+    }
 }

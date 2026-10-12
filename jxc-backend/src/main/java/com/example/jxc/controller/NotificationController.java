@@ -1,6 +1,7 @@
 package com.example.jxc.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.jxc.aspect.OperationLog;
 import com.example.jxc.common.PageResult;
 import com.example.jxc.common.Result;
 import com.example.jxc.entity.Notification;
@@ -54,13 +55,16 @@ public class NotificationController {
         return Result.success();
     }
 
+    @OperationLog(action = "\u9884\u8b66\u626b\u63cf")
     @PostMapping("/check-stock")
     public Result<Void> checkStockWarnings(HttpServletRequest request) {
         String role = (String) request.getAttribute("role");
-        if (!"admin".equals(role)) {
-            throw new BusinessException("\u65e0\u6743\u64cd\u4f5c\uff0c\u4ec5\u7ba1\u7406\u5458\u53ef\u7528");
+        // \u89d2\u8272\u4e32\u53d6\u81ea UserServiceImpl.ROLE_LABELS\uff1a\u8d85\u7ea7\u7ba1\u7406\u5458\u662f super_admin\uff0c\u4e0d\u662f admin
+        if (!"super_admin".equals(role)) {
+            throw new BusinessException("\u65e0\u6743\u64cd\u4f5c\uff0c\u4ec5\u8d85\u7ea7\u7ba1\u7406\u5458\u53ef\u7528");
         }
         notificationService.checkStockWarnings();
+        notificationService.checkBatchExpiry();
         return Result.success();
     }
 }

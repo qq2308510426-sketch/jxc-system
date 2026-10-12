@@ -36,7 +36,7 @@
             <td class="px-4 py-3 text-sm text-slate-900">{{row.purchasePrice?'¥'+row.purchasePrice:'-'}}</td>
             <td class="px-4 py-3 text-sm text-slate-600">{{row.productionDate||'-'}}</td>
             <td class="px-4 py-3 text-sm" :class="isExpiringSoon(row.expiryDate)?'text-red-600 font-medium':'text-slate-600'">{{row.expiryDate||'-'}}</td>
-            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium" :class="row.status===1?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-600'">{{row.status===1?'正常':'已过期'}}</span></td>
+            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-full text-xs font-medium" :class="row.status===1?'bg-emerald-50 text-emerald-700':'bg-slate-100 text-slate-600'">{{row.status===1?'在库':'已出清/过期'}}</span></td>
           </tr>
           <tr v-if="!tableData.length"><td colspan="9" class="px-4 py-12 text-center text-sm text-slate-400">暂无数据</td></tr>
         </tbody>

@@ -3,12 +3,16 @@ package com.example.jxc.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.example.jxc.entity.Order;
+import com.example.jxc.entity.PurchaseOrder;
 import com.example.jxc.entity.Return;
 import com.example.jxc.entity.ReturnItem;
 import com.example.jxc.entity.AccountPayable;
 import com.example.jxc.entity.AccountReceivable;
 import com.example.jxc.dto.StockOperateDTO;
 import com.example.jxc.mapper.AccountPayableMapper;
+import com.example.jxc.mapper.OrderMapper;
+import com.example.jxc.mapper.PurchaseOrderMapper;
 import com.example.jxc.mapper.AccountReceivableMapper;
 import com.example.jxc.service.StockService;
 import com.example.jxc.exception.BusinessException;
@@ -42,6 +46,12 @@ public class ReturnServiceImpl extends ServiceImpl<ReturnMapper, Return> impleme
 
     @Autowired
     private AccountReceivableMapper receivableMapper;
+
+    @Autowired
+    private OrderMapper orderMapper;
+
+    @Autowired
+    private PurchaseOrderMapper purchaseOrderMapper;
 
     @Override
     @Transactional
@@ -170,6 +180,7 @@ public class ReturnServiceImpl extends ServiceImpl<ReturnMapper, Return> impleme
                 ar.setStatus(1);
             }
             receivableMapper.updateById(ar);
+            syncOrderPaymentStatus(ar.getOrderId(), ar.getPaidAmount(), ar.getAmount());
         }
     }
 
@@ -199,7 +210,34 @@ public class ReturnServiceImpl extends ServiceImpl<ReturnMapper, Return> impleme
                 ap.setStatus(1);
             }
             payableMapper.updateById(ap);
+            syncPurchasePaymentStatus(ap.getPurchaseOrderId(), ap.getPaidAmount(), ap.getAmount());
         }
+    }
+
+    /** 应收变化后重算销售订单的收款状态，保持单据与台账一致。 */
+    private void syncOrderPaymentStatus(Long orderId, BigDecimal paid, BigDecimal amount) {
+        if (orderId == null || paid == null || amount == null) {
+            return;
+        }
+        Order order = orderMapper.selectById(orderId);
+        if (order == null) {
+            return;
+        }
+        order.setPaymentStatus(paid.compareTo(amount) >= 0 ? 2 : (paid.compareTo(BigDecimal.ZERO) > 0 ? 1 : 0));
+        orderMapper.updateById(order);
+    }
+
+    /** 应付变化后重算采购订单的付款状态。 */
+    private void syncPurchasePaymentStatus(Long purchaseOrderId, BigDecimal paid, BigDecimal amount) {
+        if (purchaseOrderId == null || paid == null || amount == null) {
+            return;
+        }
+        PurchaseOrder order = purchaseOrderMapper.selectById(purchaseOrderId);
+        if (order == null) {
+            return;
+        }
+        order.setPaymentStatus(paid.compareTo(amount) >= 0 ? 2 : (paid.compareTo(BigDecimal.ZERO) > 0 ? 1 : 0));
+        purchaseOrderMapper.updateById(order);
     }
 
     @Override

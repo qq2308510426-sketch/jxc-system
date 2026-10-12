@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Data
 public class StockOperateDTO {
@@ -23,6 +24,10 @@ public class StockOperateDTO {
     private String batchNo;
 
     private String serialNo;
+
+    private LocalDate productionDate;
+
+    private LocalDate expiryDate;
 
     @NotNull(message = "数量不能为空")
     @Min(value = 1, message = "数量必须大于0")

@@ -151,6 +151,7 @@ public class UserController {
         return Result.success(userInfo);
     }
 
+    @OperationLog(action = "修改密码")
     @PutMapping("/change-password")
     public Result<Void> changePassword(@Valid @RequestBody ChangePasswordDTO dto, HttpServletRequest request) {
         Long userId = ((Number) request.getAttribute("userId")).longValue();

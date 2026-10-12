@@ -5,13 +5,19 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.jxc.entity.Notification;
 import com.example.jxc.entity.Product;
+import com.example.jxc.entity.ProductBatch;
 import com.example.jxc.mapper.NotificationMapper;
+import com.example.jxc.mapper.ProductBatchMapper;
 import com.example.jxc.mapper.ProductMapper;
 import com.example.jxc.service.NotificationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Notification> implements NotificationService {
@@ -21,6 +27,9 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Not
 
     @Autowired
     private ProductMapper productMapper;
+
+    @Autowired
+    private ProductBatchMapper productBatchMapper;
 
     @Override
     public void createNotification(String type, String title, String content, Long relatedId, Long userId) {
@@ -59,6 +68,51 @@ public class NotificationServiceImpl extends ServiceImpl<NotificationMapper, Not
                     null
                 );
             }
+        }
+    }
+
+    @Override
+    public void checkBatchExpiry() {
+        LocalDate today = LocalDate.now();
+        LocalDate soon = today.plusDays(7);
+        LambdaQueryWrapper<ProductBatch> bw = new LambdaQueryWrapper<>();
+        bw.eq(ProductBatch::getStatus, 1)
+          .gt(ProductBatch::getQuantity, 0)
+          .isNotNull(ProductBatch::getExpiryDate)
+          .le(ProductBatch::getExpiryDate, soon)
+          .orderByAsc(ProductBatch::getExpiryDate);
+        List<ProductBatch> batches = productBatchMapper.selectList(bw);
+        if (batches.isEmpty()) {
+            return;
+        }
+
+        Map<Long, Product> products = productMapper
+            .selectBatchIds(batches.stream().map(ProductBatch::getProductId).distinct().collect(Collectors.toList()))
+            .stream().collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        for (ProductBatch batch : batches) {
+            Product product = products.get(batch.getProductId());
+            if (product == null) {
+                continue;
+            }
+            boolean expired = batch.getExpiryDate().isBefore(today);
+            String type = expired ? "BATCH_EXPIRED" : "BATCH_EXPIRING";
+
+            LambdaQueryWrapper<Notification> nw = new LambdaQueryWrapper<>();
+            nw.eq(Notification::getType, type)
+              .eq(Notification::getRelatedId, batch.getId())
+              .apply("DATE(create_time) = CURDATE()");
+            if (notificationMapper.selectCount(nw) > 0) {
+                continue;
+            }
+
+            String title = (expired ? "已过效期批次: " : "临期批次预警: ") + product.getName();
+            String content = "「" + product.getName() + "」批次 " + batch.getBatchNo()
+                + " 效期至 " + batch.getExpiryDate()
+                + (expired ? "（已过期 " + today.until(batch.getExpiryDate()).getDays() + " 天）"
+                           : "（剩 " + today.until(batch.getExpiryDate()).getDays() + " 天）")
+                + "，在库数量 " + batch.getQuantity();
+            createNotification(type, title, content, batch.getId(), null);
         }
     }
 

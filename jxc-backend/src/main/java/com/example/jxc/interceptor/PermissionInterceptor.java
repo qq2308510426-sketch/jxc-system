@@ -1,14 +1,18 @@
 package com.example.jxc.interceptor;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.example.jxc.entity.Log;
 import com.example.jxc.entity.RolePermission;
+import com.example.jxc.mapper.LogMapper;
 import com.example.jxc.mapper.RolePermissionMapper;
+import com.example.jxc.util.ClientIpUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Component
@@ -16,6 +20,9 @@ public class PermissionInterceptor implements HandlerInterceptor {
 
     @Autowired
     private RolePermissionMapper rolePermissionMapper;
+
+    @Autowired
+    private LogMapper logMapper;
 
     private static final Set<String> PUBLIC_PATHS = new HashSet<>(Arrays.asList(
         "/api/auth/login",
@@ -41,6 +48,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
 
         String role = (String) request.getAttribute("role");
         if (role == null) {
+            audit(request, null, "\u672a\u77e5\u89d2\u8272");
             sendForbidden(response, "\u672a\u77e5\u89d2\u8272");
             return false;
         }
@@ -52,6 +60,7 @@ public class PermissionInterceptor implements HandlerInterceptor {
         // Resolve required permission from path + method
         String permission = resolvePermission(path, request.getMethod());
         if (permission == null) {
+            audit(request, role, "\u672a\u77e5\u8d44\u6e90 " + path);
             sendForbidden(response, "\u672a\u77e5\u8d44\u6e90\u62d2\u7edd\u8bbf\u95ee");
             return false;
         }
@@ -63,11 +72,29 @@ public class PermissionInterceptor implements HandlerInterceptor {
         long count = rolePermissionMapper.selectCount(wrapper);
 
         if (count == 0) {
+            audit(request, role, "\u7f3a\u5c11\u6743\u9650 " + permission);
             sendForbidden(response, "\u65e0\u6743\u8bbf\u95ee: " + permission);
             return false;
         }
 
         return true;
+    }
+
+    /** 被拦下的请求也要留痕，否则越权探测在库里完全看不见。 */
+    private void audit(HttpServletRequest request, String role, String reason) {
+        try {
+            Object userIdObj = request.getAttribute("userId");
+            Log log = new Log();
+            log.setUserId(userIdObj instanceof Number ? ((Number) userIdObj).longValue() : null);
+            log.setAction("越权拦截");
+            log.setDetail(request.getMethod() + " " + request.getRequestURI()
+                + " | 角色=" + (role == null ? "未登录" : role) + " | " + reason);
+            log.setIp(ClientIpUtil.getClientIp(request));
+            log.setCreateTime(LocalDateTime.now());
+            logMapper.insert(log);
+        } catch (Exception ignored) {
+            // 审计写入失败不能影响拦截本身
+        }
     }
 
     private void sendForbidden(HttpServletResponse response, String message) throws Exception {

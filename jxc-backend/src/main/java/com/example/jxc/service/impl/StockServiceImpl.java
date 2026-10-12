@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -159,15 +161,79 @@ public class StockServiceImpl extends ServiceImpl<StockInMapper, StockIn> implem
         adjustWarehouseStock(dto.getProductId(), warehouseId, addQty);
 
         if (dto.getBatchNo() != null && !dto.getBatchNo().isEmpty()) {
-            ProductBatch batch = new ProductBatch();
+            upsertBatch(dto, operatorId);
+        }
+    }
+
+    /** 同一批次号入库时累加数量，避免一个批次号被登记成多行。 */
+    private void upsertBatch(StockOperateDTO dto, Long operatorId) {
+        LambdaQueryWrapper<ProductBatch> bw = new LambdaQueryWrapper<>();
+        bw.eq(ProductBatch::getProductId, dto.getProductId())
+          .eq(ProductBatch::getBatchNo, dto.getBatchNo());
+        if (dto.getSerialNo() != null && !dto.getSerialNo().isEmpty()) {
+            bw.eq(ProductBatch::getSerialNo, dto.getSerialNo());
+        } else {
+            bw.and(w -> w.isNull(ProductBatch::getSerialNo).or().eq(ProductBatch::getSerialNo, ""));
+        }
+        ProductBatch batch = productBatchMapper.selectOne(bw);
+        if (batch == null) {
+            batch = new ProductBatch();
             batch.setProductId(dto.getProductId());
             batch.setBatchNo(dto.getBatchNo());
             batch.setSerialNo(dto.getSerialNo());
+            batch.setProductionDate(dto.getProductionDate());
+            batch.setExpiryDate(dto.getExpiryDate());
             batch.setQuantity(dto.getQuantity());
             batch.setSupplierId(dto.getSupplierId());
             batch.setPurchasePrice(dto.getUnitPrice());
             batch.setStatus(1);
             productBatchMapper.insert(batch);
+        } else {
+            if (batch.getExpiryDate() == null && dto.getExpiryDate() != null) {
+                batch.setExpiryDate(dto.getExpiryDate());
+            }
+            if (batch.getProductionDate() == null && dto.getProductionDate() != null) {
+                batch.setProductionDate(dto.getProductionDate());
+            }
+            batch.setQuantity((batch.getQuantity() == null ? 0 : batch.getQuantity()) + dto.getQuantity());
+            if (batch.getStatus() != null && batch.getStatus() == 2 && batch.getQuantity() > 0) {
+                batch.setStatus(1);
+            }
+            productBatchMapper.updateById(batch);
+        }
+    }
+
+    /**
+     * 出库按“先到期先出”核销批次：无有效期的批次排在最后。
+     * 批次只登记到商品维度（表里没有仓库列），因此按商品全部批次排序。
+     * 历史入库未登记批次时允许核销不完，不阻断出库。
+     */
+    private void consumeBatches(Long productId, int quantity) {
+        LambdaQueryWrapper<ProductBatch> bw = new LambdaQueryWrapper<>();
+        bw.eq(ProductBatch::getProductId, productId)
+          .eq(ProductBatch::getStatus, 1)
+          .gt(ProductBatch::getQuantity, 0);
+        List<ProductBatch> batches = productBatchMapper.selectList(bw);
+        batches.sort(Comparator.comparing(
+                (ProductBatch b) -> b.getExpiryDate() == null ? LocalDate.of(9999, 12, 31) : b.getExpiryDate())
+            .thenComparing(ProductBatch::getId));
+
+        int remain = quantity;
+        for (ProductBatch b : batches) {
+            if (remain <= 0) {
+                break;
+            }
+            int have = b.getQuantity() == null ? 0 : b.getQuantity();
+            int take = Math.min(have, remain);
+            if (take <= 0) {
+                continue;
+            }
+            b.setQuantity(have - take);
+            if (b.getQuantity() == 0) {
+                b.setStatus(2);
+            }
+            productBatchMapper.updateById(b);
+            remain -= take;
         }
     }
 
@@ -195,6 +261,10 @@ public class StockServiceImpl extends ServiceImpl<StockInMapper, StockIn> implem
         product.setStock(product.getStock() + dto.getQuantity());
         saveProduct(product);
         adjustWarehouseStock(dto.getProductId(), warehouseId, dto.getQuantity());
+        // 退货明细没有批次维度：带批次号才回补该批次，否则只调整库存，批次数量可在批次管理页校正
+        if (dto.getBatchNo() != null && !dto.getBatchNo().isEmpty()) {
+            upsertBatch(dto, operatorId);
+        }
         return warehouseId;
     }
 
@@ -208,6 +278,13 @@ public class StockServiceImpl extends ServiceImpl<StockInMapper, StockIn> implem
 
         if (product.getStock() < dto.getQuantity()) {
             throw new BusinessException("\u5e93\u5b58\u4e0d\u8db3\uff0c\u5f53\u524d\u5e93\u5b58: " + product.getStock());
+        }
+
+        // 可用库存 = 总库存 - 订单预留；否则手工出库会把已下单未发的货抢走，导致发货时无货可发
+        int reserved = product.getReservedStock() == null ? 0 : product.getReservedStock();
+        if (product.getStock() - reserved < dto.getQuantity()) {
+            throw new BusinessException("\u53ef\u7528\u5e93\u5b58\u4e0d\u8db3\uff1a\u603b\u5e93\u5b58 " + product.getStock()
+                + "\uff0c\u5df2\u88ab\u8ba2\u5355\u9884\u7559 " + reserved);
         }
 
         Long warehouseId = effectiveWarehouse(dto, operatorId);
@@ -227,6 +304,7 @@ public class StockServiceImpl extends ServiceImpl<StockInMapper, StockIn> implem
         product.setStock(product.getStock() - dto.getQuantity());
         saveProduct(product);
         adjustWarehouseStock(dto.getProductId(), warehouseId, -dto.getQuantity());
+        consumeBatches(dto.getProductId(), dto.getQuantity());
     }
 
     @Override
@@ -292,6 +370,12 @@ public class StockServiceImpl extends ServiceImpl<StockInMapper, StockIn> implem
 
         if (product.getStock() < stockIn.getQuantity()) {
             throw new BusinessException("\u5e93\u5b58\u4e0d\u8db3\uff0c\u65e0\u6cd5\u64a4\u9500\u5165\u5e93");
+        }
+
+        int reservedNow = product.getReservedStock() == null ? 0 : product.getReservedStock();
+        if (product.getStock() - reservedNow < stockIn.getQuantity()) {
+            throw new BusinessException("\u8be5\u6279\u6b21\u5df2\u88ab\u8ba2\u5355\u9884\u7559 " + reservedNow
+                + "\uff0c\u65e0\u6cd5\u64a4\u9500\u5165\u5e93");
         }
 
         Long scope = resolveWarehouseId(operatorId);
