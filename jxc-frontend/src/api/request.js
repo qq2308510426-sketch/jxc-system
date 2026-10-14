@@ -3,11 +3,7 @@ import { ElMessage } from 'element-plus'
 import router from '@/router'
 
 function getApiBaseUrl() {
-  const envUrl = import.meta.env.VITE_API_BASE_URL
-  if (envUrl && envUrl !== '' && !envUrl.includes('koyeb')) {
-    return envUrl
-  }
-  return 'http://localhost:8080/api'
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
 }
 
 const request = axios.create({
@@ -16,7 +12,6 @@ const request = axios.create({
 })
 
 request.interceptors.request.use(config => {
-  config.headers['ngrok-skip-browser-warning'] = 'true'
   const token = localStorage.getItem('token')
   if (token) {
     config.headers['Authorization'] = 'Bearer ' + token
